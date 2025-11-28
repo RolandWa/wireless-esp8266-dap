@@ -58,7 +58,26 @@ jobs:
         python ./idf.py fullclean
         python ./idf.py build
 
-    # 6. Build process for ESP32 family (Using official Docker container action)
+    # 6. CRITICAL FIX: Force Enable MDNS in sdkconfig for ESP32 family
+    - name: Force Enable MDNS in sdkconfig
+      if: matrix.target-hardware != 'esp8266'
+      run: |
+        CONFIG_FILE="sdkconfig.${{ matrix.target-hardware }}"
+        if [ -f "$CONFIG_FILE" ]; then
+         echo "Using target-specific config file: $CONFIG_FILE"
+        elif [ -f "sdkconfig" ]; then
+         CONFIG_FILE="sdkconfig"
+         echo "Using default config file: $CONFIG_FILE"
+        else
+         echo "Warning: No sdkconfig file found. Skipping MDNS fix."
+         exit 0
+        fi
+    
+        echo "Forcing CONFIG_MDNS_ENABLED=y into $CONFIG_FILE"
+        sed -i '/CONFIG_MDNS_ENABLED/d' "$CONFIG_FILE" 2>/dev/null || true
+        echo "CONFIG_MDNS_ENABLED=y" >> "$CONFIG_FILE"
+
+    # 7. Build process for ESP32 family (Using official Docker container action)
     - name: Build (ESP32 family)
       if: matrix.target-hardware != 'esp8266'
       uses: espressif/esp-idf-ci-action@v1
@@ -67,7 +86,7 @@ jobs:
         target: ${{ matrix.target-hardware }}
         path: './'
 
-    # 7. Merge binary files into a single factory firmware
+    # 8. Merge binary files into a single factory firmware
     # Logic handles specific bootloader offsets: 0x1000 for original ESP32, 0x0 for others
     - name: Merge binary files
       run: |
