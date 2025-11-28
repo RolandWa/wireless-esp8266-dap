@@ -52,8 +52,6 @@ jobs:
     - name: Build (ESP8266)
       if: matrix.target-hardware == 'esp8266'
       run: |
-        rm -rf build
-        chmod -R u+w
         export IDF_PATH=$PWD/ESP8266_RTOS_SDK
         export PATH="$PATH:$PWD/xtensa-lx106-elf/bin"
         python ./idf.py fullclean
@@ -81,11 +79,11 @@ jobs:
         
         echo "Merging binaries for ${{ matrix.target-hardware }} with bootloader offset $BOOTLOADER_OFFSET..."
         
-        sudo python -m esptool --chip ${{ matrix.target-hardware }} merge_bin \
-          -o build/wireless_esp_dap_full.bin \
-          $BOOTLOADER_OFFSET build/bootloader/bootloader.bin \
-          0x8000 build/partition_table/partition-table.bin \
-          0x10000 build/wireless_esp_dap.bin
+        sudo python3 -m esptool --chip ${{ matrix.target-hardware }} merge_bin \
+        -o build/wireless_esp_dap_full.bin \
+        $BOOTLOADER_OFFSET build/bootloader/bootloader.bin \
+        0x8000 build/partition_table/partition-table.bin \
+        0x10000 build/wireless_esp_dap.bin
           
         sudo mv build/wireless_esp_dap.bin build/wireless_esp_dap_app.bin
 
