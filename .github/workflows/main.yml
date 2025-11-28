@@ -30,6 +30,8 @@ jobs:
       if: matrix.target-hardware == 'esp8266'
       run: |
         sudo apt update
+        git config --global url."https://github.com/eclipse/tinydtls.git".insteadOf "https://git.eclipse.org/r/tinydtls/org.eclipse.tinydtls"
+        git submodule update --init --recursive
         sudo apt install -y gcc git wget make libncurses-dev flex bison python-is-python3 python3-setuptools python3-pip python3-serial ninja-build
         wget https://dl.espressif.com/dl/xtensa-lx106-elf-linux64-1.22.0-100-ge567ec7-5.2.0.tar.gz
 
