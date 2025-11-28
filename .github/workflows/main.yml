@@ -38,7 +38,7 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y gcc git wget make libncurses-dev flex bison python-is-python3 python3-setuptools python3-pip python3-serial ninja-build
-        python -m pip install esptool
+        # python -m pip install esptool
 
     # 4. Setup Xtensa Toolchain (Required only for ESP8266 legacy SDK)
     - name: Setup Toolchain (ESP8266)
@@ -73,7 +73,7 @@ jobs:
       run: |
         git clone https://github.com/espressif/esptool.git
         git -C ./esptool/ checkout tags/v4.6.2 -b merge_wirless_bin
-        sudo pip3 install ./esptool/
+        # sudo pip3 install ./esptool/
         BOOTLOADER_OFFSET="0x0"
         if [ "${{ matrix.target-hardware }}" == "esp32" ]; then
           BOOTLOADER_OFFSET="0x1000"
