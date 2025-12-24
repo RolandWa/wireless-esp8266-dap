@@ -1,0 +1,62 @@
+{
+  "last_sch_text_sim_command": "",
+  "tabs": [
+    {
+      "analysis": "OP",
+      "commands": [
+        ".op",
+        ".kicad adjustpaths",
+        ".save all",
+        ".probe alli",
+        ".probe allp"
+      ]
+    },
+    {
+      "analysis": "TRAN",
+      "commands": [
+        ".tran 1n 2m",
+        ".kicad adjustpaths",
+        ".save all",
+        ".probe alli",
+        ".probe allp"
+      ],
+      "dottedSecondary": true,
+      "margins": {
+        "bottom": 45,
+        "left": 70,
+        "right": 70,
+        "top": 30
+      },
+      "measurements": [],
+      "showGrid": true,
+      "traces": [
+        {
+          "color": "rgb(228, 26, 28)",
+          "signal": "V(+5V)",
+          "trace_type": 257
+        },
+        {
+          "color": "rgb(55, 126, 184)",
+          "cursor1": {
+            "position": 2.6702269692923943e-06,
+            "x_format": "3~s",
+            "y_format": "3~V"
+          },
+          "cursorD": {
+            "x_format": "3~s",
+            "y_format": "3~V"
+          },
+          "signal": "V(/VTarget)",
+          "trace_type": 257
+        },
+        {
+          "color": "rgb(77, 175, 74)",
+          "signal": "V(/VTarget_PWM)",
+          "trace_type": 257
+        }
+      ]
+    }
+  ],
+  "user_defined_signals": [],
+  "version": 6
+}
