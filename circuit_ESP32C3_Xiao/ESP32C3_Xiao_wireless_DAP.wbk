@@ -14,20 +14,29 @@
     {
       "analysis": "TRAN",
       "commands": [
-        ".tran 1n 2m",
+        ".tran 100u 8m 1.6m 100u uic",
         ".kicad adjustpaths",
         ".save all",
         ".probe alli",
         ".probe allp"
       ],
       "dottedSecondary": true,
+      "legend": {
+        "x": 0,
+        "y": 0
+      },
       "margins": {
         "bottom": 45,
         "left": 70,
         "right": 70,
         "top": 30
       },
-      "measurements": [],
+      "measurements": [
+        {
+          "expr": "MAX V(/VTarget)",
+          "format": "3~V"
+        }
+      ],
       "showGrid": true,
       "traces": [
         {
@@ -36,22 +45,13 @@
           "trace_type": 257
         },
         {
-          "color": "rgb(55, 126, 184)",
-          "cursor1": {
-            "position": 2.6702269692923943e-06,
-            "x_format": "3~s",
-            "y_format": "3~V"
-          },
-          "cursorD": {
-            "x_format": "3~s",
-            "y_format": "3~V"
-          },
-          "signal": "V(/VTarget)",
+          "color": "rgb(255, 127, 0)",
+          "signal": "V(/INPut)",
           "trace_type": 257
         },
         {
-          "color": "rgb(77, 175, 74)",
-          "signal": "V(/VTarget_PWM)",
+          "color": "rgb(0, 255, 0)",
+          "signal": "V(/VTarget)",
           "trace_type": 257
         }
       ]
