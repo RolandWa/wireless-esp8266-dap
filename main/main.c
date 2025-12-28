@@ -18,6 +18,7 @@
 #include "main/timer.h"
 #include "main/wifi_configuration.h"
 #include "main/wifi_handle.h"
+#include "main/vtarget_pwm.h"
 
 #include "components/corsacOTA/src/corsacOTA.h"
 
@@ -103,6 +104,13 @@ void app_main() {
     wifi_init();
     DAP_Setup();
     timer_init();
+
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
+    // Initialize VTarget PWM control (GPIO3)
+    ESP_ERROR_CHECK(vtarget_pwm_init());
+    // Set default VTarget to 3.3V
+    vtarget_set_voltage(3300);
+#endif
 
 #if (USE_MDNS == 1)
     mdns_setup();
