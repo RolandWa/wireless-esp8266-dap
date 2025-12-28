@@ -64,8 +64,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #elif defined CONFIG_IDF_TARGET_ESP32C3
     #define UART_BRIDGE_TX UART_NUM_1
     #define UART_BRIDGE_RX UART_NUM_1
-    #define UART_BRIDGE_TX_PIN 19
-    #define UART_BRIDGE_RX_PIN 18 // PIN18 has 50000ns glitch during the power-up
+    #define UART_BRIDGE_TX_PIN 21  // GPIO21 (D6) on XIAO-ESP32-C3
+    #define UART_BRIDGE_RX_PIN 20  // GPIO20 (D7) on XIAO-ESP32-C3
 #else
     #error unknown hardware
 #endif

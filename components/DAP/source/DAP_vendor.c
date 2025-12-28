@@ -29,6 +29,97 @@
 #include "components/DAP/include/DAP.h"
 #include "components/elaphureLink/elaphureLink_protocol.h"
 
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+#include "esp_adc/adc_oneshot.h"
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
+#include "hal/adc_types.h"
+
+static adc_oneshot_unit_handle_t adc1_handle = NULL;
+static adc_cali_handle_t adc1_cali_handle = NULL;
+static bool adc_initialized = false;
+
+// Initialize ADC for VTarget measurement on GPIO2 (ADC1_CHANNEL_2)
+static void vtarget_adc_init(void) {
+    if (adc_initialized) {
+        return;
+    }
+    
+    // Configure ADC1
+    adc_oneshot_unit_init_cfg_t init_config = {
+        .unit_id = ADC_UNIT_1,
+    };
+    ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config, &adc1_handle));
+    
+    // Configure ADC1 Channel 2 (GPIO2)
+    adc_oneshot_chan_cfg_t config = {
+        .bitwidth = ADC_BITWIDTH_DEFAULT,
+        .atten = ADC_ATTEN_DB_11,  // 0-3.3V range
+    };
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_2, &config));
+    
+    // Setup calibration
+    adc_cali_curve_fitting_config_t cali_config = {
+        .unit_id = ADC_UNIT_1,
+        .atten = ADC_ATTEN_DB_11,
+        .bitwidth = ADC_BITWIDTH_DEFAULT,
+    };
+    esp_err_t ret = adc_cali_create_scheme_curve_fitting(&cali_config, &adc1_cali_handle);
+    if (ret == ESP_OK) {
+        adc_initialized = true;
+    }
+}
+
+// Read VTarget voltage in millivolts (compensated for 1/2 voltage divider)
+// Takes 20 samples and returns the average for better accuracy
+static uint16_t vtarget_read_mv(void) {
+    if (!adc_initialized) {
+        vtarget_adc_init();
+    }
+    
+    if (!adc1_handle) {
+        return 0;
+    }
+    
+    uint32_t voltage_sum = 0;
+    uint8_t valid_samples = 0;
+    
+    // Read ADC 20 times and average
+    for (int i = 0; i < 20; i++) {
+        int adc_raw = 0;
+        int voltage_mv = 0;
+        
+        // Read ADC
+        esp_err_t ret = adc_oneshot_read(adc1_handle, ADC_CHANNEL_2, &adc_raw);
+        if (ret != ESP_OK) {
+            continue;
+        }
+        
+        // Convert to voltage
+        if (adc1_cali_handle) {
+            ret = adc_cali_raw_to_voltage(adc1_cali_handle, adc_raw, &voltage_mv);
+            if (ret != ESP_OK) {
+                continue;
+            }
+        } else {
+            // Fallback without calibration
+            voltage_mv = adc_raw * 3300 / 4095;
+        }
+        
+        voltage_sum += voltage_mv;
+        valid_samples++;
+    }
+    
+    if (valid_samples == 0) {
+        return 0;
+    }
+    
+    // Calculate average and compensate for 1/2 voltage divider (multiply by 2)
+    uint16_t avg_voltage = (uint16_t)(voltage_sum / valid_samples);
+    return avg_voltage * 2;
+}
+#endif // CONFIG_IDF_TARGET_ESP32C3
+
 //**************************************************************************************************
 /**
 \defgroup DAP_Vendor_Adapt_gr Adapt Vendor Commands
@@ -62,7 +153,16 @@ uint32_t DAP_ProcessVendorCommand(const uint8_t *request, uint8_t *response) {
 #endif
       break;
 
-    case ID_DAP_Vendor1:  break;
+    case ID_DAP_Vendor1:  // Read VTarget voltage
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+      {
+        uint16_t voltage_mv = vtarget_read_mv();
+        *response++ = (uint8_t)(voltage_mv & 0xFF);        // Low byte
+        *response++ = (uint8_t)((voltage_mv >> 8) & 0xFF); // High byte
+        num += 2;  // 2 bytes in response
+      }
+#endif
+      break;
     case ID_DAP_Vendor2:  break;
     case ID_DAP_Vendor3:  break;
     case ID_DAP_Vendor4:  break;

@@ -185,11 +185,16 @@ There is built-in ipv4 only mDNS server. You can access the device using `dap.lo
 | Other              |               |
 |--------------------|---------------|
 | LED\_WIFI\_STATUS  | GPIO10        |
-| Tx                 | GPIO19        |
-| Rx                 | GPIO18        |
+| VTarget Sense      | GPIO2 (ADC0)  |
+| Tx                 | GPIO21        |
+| Rx                 | GPIO20        |
 
 
 > Rx and Tx is used for uart bridge, not enabled by default.
+> 
+> VTarget is sensed via a 1/2 voltage divider on GPIO2 (ADC0). Use DAP Vendor Command 0x81 to read target voltage.
+> 
+> **Note for XIAO-ESP32-C3:** UART pins are GPIO21 (D6/TX) and GPIO20 (D7/RX).
 
 
 </details>
@@ -227,18 +232,49 @@ There is built-in ipv4 only mDNS server. You can access the device using `dap.lo
 
 ## Hardware Reference
 
-Only a hardware reference for the ESP8266 is currently available.
-
+### ESP8266 Reference Design
 
 Here we provide a simple example for reference:
 
 ![sch](https://user-images.githubusercontent.com/17078589/150284806-e6dff0fa-4fe1-4d86-ac45-3b657fbea6b7.png)
 
+### ESP32-C3 XIAO Reference Design
+
+A complete hardware design for the Seeed Studio XIAO ESP32-C3 module is available with the following features:
+
+- **Multiple Debug Connector Options:**
+  - **J3:** 10-pin Cortex Debug (1.27mm pitch, SMD) - Compact SMD connector
+  - **J1:** 10-pin Cortex Debug (2.54mm pitch, IDC) - Standard through-hole
+  - **J2:** 20-pin ARM Standard JTAG (2.54mm pitch, IDC) - Compatible with J-Link and other standard debuggers
+- **VTarget Voltage Sensing** via 1/2 voltage divider on GPIO2 (supports 0-6.6V range)
+- **UART Bridge** on GPIO20 (RX/D7) and GPIO21 (TX/D6)
+- **3.3V Target Power Supply** option with MOSFET switch
+- Full schematic and PCB layout in KiCAD format
+
+**Schematic:** [circuit_ESP32C3_Xiao/ESP32C3_Xiao_wireless_DAP.kicad_sch](circuit_ESP32C3_Xiao/ESP32C3_Xiao_wireless_DAP.kicad_sch)
+
+**Schematic PDF:** [circuit_ESP32C3_Xiao/documentations/ESP32C3_Xiao_wireless_DAP.pdf](circuit_ESP32C3_Xiao/documentations/ESP32C3_Xiao_wireless_DAP.pdf)
+
+**Additional Documentation:** [circuit_ESP32C3_Xiao/doc/](circuit_ESP32C3_Xiao/doc/) includes ARM JTAG connector pinouts and component datasheets
+
+**PCBA Preview:**
+
+![ESP32C3 XIAO PCBA ](circuit_ESP32C3_Xiao/documentations/ESP32C3_Xiao_wireless_DAP.png)
+
+**Key Features:**
+- Seeed Studio XIAO ESP32-C3 module
+- Three connector options for maximum compatibility:
+  - 1.27mm pitch for space-constrained applications
+  - 2.54mm pitch 10-pin for standard probe compatibility
+  - 2.54mm pitch 20-pin for J-Link and ARM standard debuggers
+- Target voltage monitoring via DAP Vendor Command (0x81)
+- Bi-directional UART bridge for SWO/RTT trace capture
+- Level shifter compatible design (3.3V target support)
+- Compatible with OpenOCD, pyOCD, Keil, and other standard ARM debugging tools
 
 ***Alternatively, you can connect directly with wires as we gave at the beginning, without additional circuits.***
 
-
-In addition, a complete hardware reference design is available from contributors, see [circuit](circuit)
+Additional hardware reference designs are available from contributors in the [circuit](circuit) folder.
 
 ------
 

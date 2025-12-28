@@ -99,7 +99,7 @@ This information includes:
   #define CPU_CLOCK 240000000
   // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<240MHz
 #elif defined CONFIG_IDF_TARGET_ESP32C3
-  #define CPU_CLOCK 16000000
+  #define CPU_CLOCK 160000000
   // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<160MHz
 #elif defined CONFIG_IDF_TARGET_ESP32S3
   #define CPU_CLOCK 240000000
@@ -179,7 +179,7 @@ This information includes:
 
 /// Indicate that UART Communication Port is available.
 /// This information is returned by the command \ref DAP_Info as part of <b>Capabilities</b>.
-#define DAP_UART                0               ///< DAP UART:  1 = available, 0 = not available.
+#define DAP_UART                1               ///< DAP UART:  1 = available, 0 = not available.
 
 /// USART Driver instance number for the UART Communication Port.
 #define DAP_UART_DRIVER         1               ///< USART Driver instance number (Driver_USART#).
@@ -192,7 +192,7 @@ This information includes:
 
 /// Indicate that UART Communication via USB COM Port is available.
 /// This information is returned by the command \ref DAP_Info as part of <b>Capabilities</b>.
-#define DAP_UART_USB_COM_PORT   0               ///< USB COM Port:  1 = available, 0 = not available.
+#define DAP_UART_USB_COM_PORT   1               ///< USB COM Port:  1 = available, 0 = not available.
 
 /// Debug Unit is connected to fixed Target Device.
 /// The Debug Unit may be part of an evaluation board and always connected to a fixed
@@ -377,6 +377,7 @@ __STATIC_INLINE uint8_t DAP_GetProductFirmwareVersionString (char *str) {
   #define PIN_TDI 9
   #define PIN_nTRST 4       // optional
   #define PIN_nRESET 5
+  #define PIN_VTARGET 2     // VTarget sense (ADC0) - 1/2 voltage divider
 
   #define PIN_LED_CONNECTED _ // won't be used
   #define PIN_LED_RUNNING _ // won't be used

@@ -828,7 +828,7 @@
       "workbook_filename": "ESP32C3_Xiao_wireless_DAP.wbk"
     },
     "page_layout_descr_file": "",
-    "plot_directory": "",
+    "plot_directory": "documentations/",
     "space_save_all_events": true,
     "spice_current_sheet_as_root": false,
     "spice_external_command": "spice \"%I\"",
