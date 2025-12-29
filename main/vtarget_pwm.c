@@ -16,6 +16,7 @@
 #include "vtarget_pwm.h"
 #include "driver/ledc.h"
 #include "esp_log.h"
+#include "esp_idf_version.h"
 
 static const char *TAG = "vtarget_pwm";
 
