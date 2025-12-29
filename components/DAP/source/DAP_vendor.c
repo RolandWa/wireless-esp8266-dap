@@ -124,7 +124,7 @@ static uint16_t vtarget_read_mv(void) {
 
 #else
 // Provide stubs for platforms without VTarget support (ESP8266, ESP32)
-__attribute__((weak)) esp_err_t vtarget_set_voltage(uint16_t voltage_mv) {
+esp_err_t vtarget_set_voltage(uint16_t voltage_mv) {
     (void)voltage_mv;
     return ESP_ERR_NOT_SUPPORTED;
 }
