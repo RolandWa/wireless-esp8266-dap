@@ -146,8 +146,8 @@ esp_err_t vtarget_set_voltage(uint16_t voltage_mv)
         return ret;
     }
 
-    ESP_LOGI(TAG, "VTarget set to %d mV (duty cycle: %lu / %d)",
-             voltage_mv, duty_cycle, VTARGET_PWM_MAX_DUTY);
+    ESP_LOGI(TAG, "VTarget set to %d mV (duty cycle: %u / %d)",
+             voltage_mv, (unsigned int)duty_cycle, VTARGET_PWM_MAX_DUTY);
 
     return ESP_OK;
 }
