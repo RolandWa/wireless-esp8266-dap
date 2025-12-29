@@ -37,8 +37,8 @@
 #include "esp_adc_cal.h"
 #include "esp_log.h"
 
-// Include VTarget PWM control for ESP32-C3
-#ifdef CONFIG_IDF_TARGET_ESP32C3
+// Include VTarget PWM control for ESP32 variants
+#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
 #include "main/vtarget_pwm.h"
 #endif
 
