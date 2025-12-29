@@ -28,6 +28,8 @@
 #include "components/DAP/config/DAP_config.h"
 #include "components/DAP/include/DAP.h"
 #include "components/elaphureLink/elaphureLink_protocol.h"
+#include <stdbool.h>
+#include <stdlib.h>
 
 // VTarget sensing is only available on ESP32/ESP32-C3/ESP32-S3
 #if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -37,7 +39,6 @@
 // Include VTarget PWM control for ESP32-C3
 #ifdef CONFIG_IDF_TARGET_ESP32C3
 #include "main/vtarget_pwm.h"
-#endif
 #endif
 
 static esp_adc_cal_characteristics_t *adc_chars = NULL;
