@@ -28,17 +28,18 @@
 #include "components/DAP/config/DAP_config.h"
 #include "components/DAP/include/DAP.h"
 #include "components/elaphureLink/elaphureLink_protocol.h"
+#include "esp_log.h"
+#include "esp_err.h"
 #include <stdbool.h>
 #include <stdlib.h>
+
+static const char *TAG = "DAP_vendor";
 
 // VTarget sensing is only available on ESP32-C3/ESP32-S3 XIAO boards
 #if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
-#include "esp_log.h"
 #include "main/vtarget_pwm.h"
-
-static const char *TAG = "DAP_vendor";
 static esp_adc_cal_characteristics_t *adc_chars = NULL;
 static bool adc_initialized = false;
 
@@ -122,11 +123,14 @@ static uint16_t vtarget_read_mv(void) {
 }
 
 #else
-// Provide weak stub for platforms without VTarget support (ESP8266, ESP32)
-#include "esp_err.h"
+// Provide stubs for platforms without VTarget support (ESP8266, ESP32)
 __attribute__((weak)) esp_err_t vtarget_set_voltage(uint16_t voltage_mv) {
     (void)voltage_mv;
     return ESP_ERR_NOT_SUPPORTED;
+}
+
+static uint16_t vtarget_read_mv(void) {
+    return 0xFFFF;  // Not supported
 }
 #endif // ESP32-C3/ESP32-S3
 
@@ -164,7 +168,7 @@ uint32_t DAP_ProcessVendorCommand(const uint8_t *request, uint8_t *response) {
       break;
 
     case ID_DAP_Vendor1:  // Read VTarget voltage
-#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
       {
         uint16_t voltage_mv = vtarget_read_mv();
         *response++ = (uint8_t)(voltage_mv & 0xFF);        // Low byte
@@ -181,7 +185,7 @@ uint32_t DAP_ProcessVendorCommand(const uint8_t *request, uint8_t *response) {
       break;
 
     case ID_DAP_Vendor2:  // Set VTarget voltage (1250-5000 mV)
-#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
       {
         num += 2U << 16;  // 2 bytes in request (voltage low, high)
         uint8_t voltage_low = *request++;
