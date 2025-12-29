@@ -98,6 +98,135 @@ esp_err_t ret = vtarget_pwm_init();
 
 ### Setting Voltage
 ```c
+// Set target voltage to 3.3V
+esp_err_t ret = vtarget_set_voltage(3300);  // millivolts
+
+// Valid range: 1250 mV to 5000 mV
+vtarget_set_voltage(1250);  // Minimum voltage
+vtarget_set_voltage(5000);  // Maximum voltage
+vtarget_set_voltage(3300);  // Common 3.3V
+```
+
+### Reading Voltage
+```c
+#include "components/DAP/source/DAP_vendor.c"  // For vtarget_read_mv()
+
+// Read actual VTarget via ADC (requires GPIO2 connected)
+uint16_t voltage_mv = vtarget_read_mv();  // Returns averaged reading
+printf("VTarget: %u mV\n", voltage_mv);
+```
+
+### Raw Duty Cycle Control
+```c
+// For calibration/testing: set raw PWM duty
+vtarget_set_duty_raw(0);     // 0% → ~5V output
+vtarget_set_duty_raw(512);   // 50% → ~3.1V output  
+vtarget_set_duty_raw(1023);  // 100% → ~1.25V output
+
+// Get current duty
+uint16_t duty = vtarget_get_duty();
+```
+
+## DAP Vendor Commands
+
+### Command 0x81: Read VTarget Voltage
+Read the target voltage via ADC (GPIO2 sensing).
+
+**Request:**
+```
+Byte 0: 0x81 (Command ID)
+```
+
+**Response:**
+```
+Byte 0: 0x81 (Command ID echo)
+Byte 1: Voltage low byte (mV)
+Byte 2: Voltage high byte (mV)
+```
+
+**Example:**
+- Reading 3300 mV (3.3V):
+  - Response: `0x81 0xE4 0x0C` (3300 = 0x0CE4)
+- Reading 1800 mV (1.8V):
+  - Response: `0x81 0x08 0x07` (1800 = 0x0708)
+
+### Command 0x82: Set VTarget Voltage
+Set the target voltage output (1250-5000 mV).
+
+**Request:**
+```
+Byte 0: 0x82 (Command ID)
+Byte 1: Voltage low byte (mV)
+Byte 2: Voltage high byte (mV)
+```
+
+**Response:**
+```
+Byte 0: 0x82 (Command ID echo)
+Byte 1: Status
+  - 0x00 = Success
+  - 0x01 = Invalid voltage range (not 1250-5000 mV)
+  - 0xFF = Not supported / other error
+```
+
+**Examples:**
+
+Set 3.3V (3300 mV):
+```
+Request:  0x82 0xE4 0x0C
+Response: 0x82 0x00  (success)
+```
+
+Set 1.8V (1800 mV):
+```
+Request:  0x82 0x08 0x07
+Response: 0x82 0x00  (success)
+```
+
+Set 5.0V (5000 mV):
+```
+Request:  0x82 0x88 0x13
+Response: 0x82 0x00  (success)
+```
+
+Set invalid 6V (6000 mV):
+```
+Request:  0x82 0x70 0x17
+Response: 0x82 0x01  (out of range)
+```
+
+**Platform Support:**
+- **ESP32-C3**: Full support (sensing + control)
+- **ESP32/ESP32-S3**: Sensing only (command 0x81)
+- **ESP8266**: Returns 0x00 0x00 for command 0x81, 0xFF for command 0x82
+
+### Using Commands from Python/PyOCD
+```python
+import pyocd
+
+# Connect to probe
+probe = pyocd.probe.aggregator.DebugProbeAggregator.get_all_connected_probes()[0]
+probe.open()
+
+# Read VTarget voltage
+response = probe.vendor_command(0x81, [])
+voltage_mv = response[0] | (response[1] << 8)
+print(f"VTarget: {voltage_mv} mV")
+
+# Set VTarget to 3.3V
+voltage_mv = 3300
+low_byte = voltage_mv & 0xFF
+high_byte = (voltage_mv >> 8) & 0xFF
+response = probe.vendor_command(0x82, [low_byte, high_byte])
+if response[0] == 0x00:
+    print("Voltage set successfully")
+elif response[0] == 0x01:
+    print("Invalid voltage range")
+else:
+    print("Command failed")
+```
+
+## Example Workflow
 // Set specific voltage (1250-5000 mV)
 vtarget_set_voltage(3300);  // 3.3V
 vtarget_set_voltage(1800);  // 1.8V

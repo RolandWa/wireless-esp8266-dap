@@ -29,11 +29,18 @@
 #include "components/DAP/include/DAP.h"
 #include "components/elaphureLink/elaphureLink_protocol.h"
 
-#ifdef CONFIG_IDF_TARGET_ESP32C3
+// VTarget sensing is only available on ESP32/ESP32-C3/ESP32-S3
+#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
 #include "hal/adc_types.h"
+
+// Include VTarget PWM control for ESP32-C3
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+#include "main/vtarget_pwm.h"
+#endif
+#endif
 
 static adc_oneshot_unit_handle_t adc1_handle = NULL;
 static adc_cali_handle_t adc1_cali_handle = NULL;
@@ -118,7 +125,7 @@ static uint16_t vtarget_read_mv(void) {
     uint16_t avg_voltage = (uint16_t)(voltage_sum / valid_samples);
     return avg_voltage * 2;
 }
-#endif // CONFIG_IDF_TARGET_ESP32C3
+#endif // ESP32/ESP32-C3/ESP32-S3
 
 //**************************************************************************************************
 /**
@@ -154,16 +161,46 @@ uint32_t DAP_ProcessVendorCommand(const uint8_t *request, uint8_t *response) {
       break;
 
     case ID_DAP_Vendor1:  // Read VTarget voltage
-#ifdef CONFIG_IDF_TARGET_ESP32C3
+#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
       {
         uint16_t voltage_mv = vtarget_read_mv();
         *response++ = (uint8_t)(voltage_mv & 0xFF);        // Low byte
         *response++ = (uint8_t)((voltage_mv >> 8) & 0xFF); // High byte
         num += 2;  // 2 bytes in response
       }
+#else
+      // VTarget sensing not supported on this target
+      *response++ = 0x00;  // Return 0V for unsupported platforms
+      *response++ = 0x00;
+      num += 2;
 #endif
       break;
-    case ID_DAP_Vendor2:  break;
+
+    case ID_DAP_Vendor2:  // Set VTarget voltage (1250-5000 mV)
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+      {
+        num += 2U << 16;  // 2 bytes in request (voltage low, high)
+        uint16_t voltage_mv = (uint16_t)(*request++) | ((uint16_t)(*request++) << 8);
+        
+        esp_err_t ret = vtarget_set_voltage(voltage_mv);
+        
+        if (ret == ESP_OK) {
+          *response++ = 0x00;  // Success
+        } else if (ret == ESP_ERR_INVALID_ARG) {
+          *response++ = 0x01;  // Invalid voltage range (not 1250-5000 mV)
+        } else {
+          *response++ = 0xFF;  // Other error
+        }
+        num += 1;  // 1 byte status response
+      }
+#else
+      // VTarget control not supported on this target
+      num += 2U << 16;  // Still consume 2 bytes from request
+      request += 2;
+      *response++ = 0xFF;  // Not supported error
+      num += 1;
+#endif
+      break;
     case ID_DAP_Vendor3:  break;
     case ID_DAP_Vendor4:  break;
     case ID_DAP_Vendor5:  break;
