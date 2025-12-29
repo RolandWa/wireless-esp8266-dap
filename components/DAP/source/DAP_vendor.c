@@ -122,12 +122,13 @@ static uint16_t vtarget_read_mv(void) {
 }
 
 #else
-// Provide weak stub for platforms without VTarget support
+// Provide weak stub for platforms without VTarget support (ESP8266, ESP32)
+#include "esp_err.h"
 __attribute__((weak)) esp_err_t vtarget_set_voltage(uint16_t voltage_mv) {
     (void)voltage_mv;
     return ESP_ERR_NOT_SUPPORTED;
 }
-#endif // ESP32/ESP32-C3/ESP32-S3
+#endif // ESP32-C3/ESP32-S3
 
 //**************************************************************************************************
 /**
