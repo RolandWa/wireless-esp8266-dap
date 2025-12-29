@@ -31,8 +31,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-// VTarget sensing is only available on ESP32/ESP32-C3/ESP32-S3
-#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
+// VTarget sensing is only available on ESP32-C3/ESP32-S3 XIAO boards
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
 #include "esp_log.h"

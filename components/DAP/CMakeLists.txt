@@ -13,9 +13,9 @@ set(COMPONENT_SRCS
 # UART.c requires ARM CMSIS drivers (Driver_USART.h, cmsis_os2.h) not available on any ESP platform
 # DAP UART functionality disabled for ESP8266, ESP32, ESP32-C3, ESP32-S3
 
-# ESP32/ESP32-C3/ESP32-S3 need esp_adc_cal for VTarget sensing
-# ESP8266 doesn't need explicit component requirements
-if(IDF_TARGET STREQUAL "esp32" OR IDF_TARGET STREQUAL "esp32c3" OR IDF_TARGET STREQUAL "esp32s3")
+# ESP32-C3/ESP32-S3 need esp_adc_cal for VTarget sensing on XIAO boards
+# ESP8266 and original ESP32 don't have VTarget hardware
+if(IDF_TARGET STREQUAL "esp32c3" OR IDF_TARGET STREQUAL "esp32s3")
     set(COMPONENT_REQUIRES esp_adc_cal driver)
 endif()
 
