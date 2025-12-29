@@ -272,6 +272,10 @@ A complete hardware design for the Seeed Studio XIAO ESP32-C3 module is availabl
 - Level shifter compatible design (3.3V target support)
 - Compatible with OpenOCD, pyOCD, Keil, and other standard ARM debugging tools
 
+**Programmable VTarget Implementation:**
+
+For ESP32-C3 XIAO designs, a programmable target voltage feature (1.25V-5V) is available using PWM-controlled voltage regulation. See the detailed implementation guide: [VTARGET_PWM_IMPLEMENTATION.md](VTARGET_PWM_IMPLEMENTATION.md)
+
 ***Alternatively, you can connect directly with wires as we gave at the beginning, without additional circuits.***
 
 Additional hardware reference designs are available from contributors in the [circuit](circuit) folder.
