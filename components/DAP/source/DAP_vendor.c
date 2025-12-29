@@ -47,6 +47,7 @@ static esp_adc_cal_characteristics_t *adc_chars = NULL;
 static bool adc_initialized = false;
 
 // Cleanup ADC resources
+__attribute__((unused))
 static void vtarget_adc_deinit(void) {
     if (adc_chars) {
         free(adc_chars);
@@ -179,7 +180,9 @@ uint32_t DAP_ProcessVendorCommand(const uint8_t *request, uint8_t *response) {
 #if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
       {
         num += 2U << 16;  // 2 bytes in request (voltage low, high)
-        uint16_t voltage_mv = (uint16_t)(*request++) | ((uint16_t)(*request++) << 8);
+        uint8_t voltage_low = *request++;
+        uint8_t voltage_high = *request++;
+        uint16_t voltage_mv = (uint16_t)voltage_low | ((uint16_t)voltage_high << 8);
         
         ESP_LOGI(TAG, "Set VTarget request: %d mV", voltage_mv);
         esp_err_t ret = vtarget_set_voltage(voltage_mv);
