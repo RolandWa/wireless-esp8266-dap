@@ -3909,7 +3909,7 @@
 		)
 		(uuid "0c42b6f9-d7c1-43e5-84bd-c0ecc8c8fa90")
 	)
-	(text ".param pulse_width = 1\n.param period = 20u\n; .dc pulse_width 0.1 0.9 0.1\n.OPTIONS METHOD=GEAR\n.OPTIONS RELTOL=0.01\n.OPTIONS VNTOL=10uV"
+	(text ".param pulse_width = 0.1\n.param period = 20u\n; .dc pulse_width 0.1 0.9 0.1\n.OPTIONS METHOD=GEAR\n.OPTIONS RELTOL=0.01\n.OPTIONS VNTOL=10uV"
 		(exclude_from_sim no)
 		(at 59.69 190.5 0)
 		(effects

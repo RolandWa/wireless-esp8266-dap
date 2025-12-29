@@ -48,6 +48,63 @@ PC WiFi ←→ Router ←→ XIAO ESP32-C3 WiFi
 GPIO20 (RX/D7) ←→ GPIO21 (TX/D6) (UART loopback)
 ```
 
+### 3. `test_vtarget_linearity.py` - VTarget Linearity Calibration
+Comprehensive linearity testing and calibration for VTarget voltage output and VTref measurement accuracy with optional DMM reference measurements.
+
+**Features:**
+- Full voltage range sweep (1.25V - 5.0V)
+- Multi-sample measurements with statistical analysis
+- **Optional Keysight 34460A/34461A/34465A/34470A DMM integration for precision reference**
+- Dual measurement comparison (DAP vs DMM)
+- Linear regression and R² calculation for both DAP and DMM
+- DAP accuracy validation against calibrated DMM
+- Integral Non-Linearity (INL) analysis
+- Differential Non-Linearity (DNL) analysis
+- CSV data export with DAP and DMM columns
+- Visualization plots (voltage vs setpoint, error analysis, DAP vs DMM)
+- Automated pass/fail criteria evaluation
+
+**Hardware Setup (Basic - DAP Only):**
+```
+PC USB ←→ XIAO ESP32-C3 USB-C port (required for VTarget power)
+```
+
+**Hardware Setup (Advanced - With DMM Reference):**
+```
+┌─────────────┐
+│     PC      │
+│             │
+├──USB───────┼──→ XIAO ESP32-C3 (DAP + VTarget Generator)
+│             │         │
+├──USB/LAN───┼──→ Keysight DMM (Precision Reference)
+└─────────────┘         │
+                        │
+            VTarget ────┴──→ DMM HI Terminal
+            GND     ────────→ DMM LO Terminal
+
+Connection Diagram:
+    XIAO ESP32-C3          Keysight 34460A/34461A DMM
+    ┌───────────┐          ┌─────────────────────┐
+    │           │          │                     │
+    │  VTarget  ├──────────┤ HI (Front Input)    │
+    │  (GPIO3)  │   Red    │                     │
+    │           │          │                     │
+    │    GND    ├──────────┤ LO (Front Input)    │
+    │           │  Black   │                     │
+    └───────────┘          └─────────────────────┘
+                                    │
+                           USB/LAN to PC (VISA)
+```
+
+**Statistical Metrics:**
+- Mean error and standard deviation (DAP vs Setpoint)
+- Maximum error (absolute and percentage)
+- Linear regression (slope, intercept, R²) for DAP
+- Linear regression (DAP vs DMM) for accuracy validation
+- DMM measurement as calibrated reference
+- Residual analysis for non-linearity
+- Step size uniformity (DNL)
+
 ## Installation
 
 ### 1. Install Python Dependencies
@@ -56,7 +113,7 @@ cd tests
 pip install -r requirements.txt
 ```
 
-### 2. Install pyOCD
+### 2. Install pyOCD and Analysis Libraries
 ```bash
 pip install pyocd
 ```
@@ -66,7 +123,24 @@ For Windows, you may also need:
 pip install pywinusb
 ```
 
-### 3. Install USB Drivers (Windows)
+### 3. Install Optional Analysis Libraries (for linearity tests)
+```bash
+pip install numpy scipy matplotlib
+```
+
+These are required for `test_vtarget_linearity.py` to perform advanced statistical analysis and plotting.
+
+### 4. Install PyVISA for DMM Integration (optional)
+```bash
+pip install pyvisa pyvisa-py
+```
+
+Required only if using Keysight DMM for reference measurements. For USB DMM connection, you may also need:
+```bash
+pip install pyusb
+```
+
+### 5. Install USB Drivers (Windows)
 - Install Zadig: https://zadig.akeo.ie/
 - Connect XIAO via USB
 - In Zadig, select "WinUSB" driver for the DAP device
@@ -134,6 +208,112 @@ python test_xiao_wifi.py --host dap.local --port 3240
 ...
 ```
 
+### VTarget Linearity Test
+```bash
+# Basic test with 20 points across full range (DAP only)
+python test_vtarget_linearity.py
+
+# With Keysight DMM reference (recommended for calibration)
+python test_vtarget_linearity.py -d "USB0::0x2A8D::0x1301::MY********::INSTR"
+
+# High-resolution test with 50 points and DMM
+python test_vtarget_linearity.py -n 50 -d "USB0::0x2A8D::0x1301::MY********::INSTR"
+
+# Test specific voltages with DMM
+python test_vtarget_linearity.py --voltages "1250,2000,3000,4000,5000" -d "USB0::0x2A8D::0x1301::MY********::INSTR"
+
+# More samples per point for higher accuracy
+python test_vtarget_linearity.py -m 20 -d "USB0::0x2A8D::0x1301::MY********::INSTR"
+
+# Specify probe by serial number
+python test_vtarget_linearity.py -s 1234567890ABCDEF -d "USB0::0x2A8D::0x1301::MY********::INSTR"
+
+# Skip plotting (faster execution)
+python test_vtarget_linearity.py --no-plot
+
+# Find DMM VISA resource string:
+python -m pyvisa-shell
+>>> list
+```
+
+**Expected Output (with DMM):**
+```
+============================================================
+VTarget Full Range Linearity Test
+============================================================
+Range: 1250-5000 mV
+Test points: 20
+Samples per point: 10
+
+Connected to DMM: Keysight Technologies,34461A,MY********,A.02.14-02.40-02.14-00.49-03-01
+DMM configured for precision DC voltage measurement
+
+Testing setpoint: 1250 mV
+  DAP Mean: 1248.50 mV, StdDev: 3.24 mV
+  DMM Mean: 1251.23 mV, StdDev: 0.12 mV
+  DAP Error vs Setpoint: -1.50 mV (-0.12%)
+  DAP Error vs DMM: -2.73 mV (-0.22%)
+
+Testing setpoint: 1447 mV
+  DAP Mean: 1445.20 mV, StdDev: 2.98 mV
+  DMM Mean: 1447.89 mV, StdDev: 0.09 mV
+  DAP Error vs Setpoint: -1.80 mV (-0.12%)
+  DAP Error vs DMM: -2.69 mV (-0.19%)
+
+...
+
+============================================================
+Linearity Statistics
+============================================================
+
+DAP vs Setpoint:
+R² (coefficient of determination): 0.999876
+Slope: 0.998234
+Intercept: 2.45 mV
+Max non-linearity: 8.34 mV
+Max DNL: 0.56%
+
+DAP vs DMM Reference:
+R²: 0.999923
+Slope: 0.998654 (ideal: 1.0)
+Intercept: 1.23 mV (ideal: 0.0)
+
+DMM vs Setpoint:
+R²: 0.999995
+Slope: 1.000124
+Intercept: -0.15 mV
+
+DAP Mean error vs Setpoint: -2.15 mV (-0.08%)
+DAP Max error vs Setpoint: 12.34 mV (0.34%)
+DAP Error std dev: 4.12 mV
+
+DAP Mean error vs DMM: -2.43 mV (-0.10%)
+DAP Max error vs DMM: 8.67 mV (0.26%)
+
+============================================================
+Test Summary
+============================================================
+Total test points: 20
+DMM reference: YES
+Results saved to: test_results/
+
+DAP Pass/Fail Criteria (vs Setpoint):
+  Max error < 2%: PASS (0.34%)
+  R² > 0.99: PASS (0.999876)
+
+DAP Accuracy (vs DMM Reference):
+  Max error < 1%: PASS (0.26%)
+  R² > 0.995: PASS (0.999923)
+
+Test complete!
+```
+
+**Output Files** (in `test_results/` directory):
+- `vtarget_linearity_YYYYMMDD_HHMMSS.csv` - Statistical summary (DAP and DMM columns)
+- `vtarget_linearity_YYYYMMDD_HHMMSS_raw.csv` - All raw measurements (DAP and DMM samples)
+- `vtarget_statistics_YYYYMMDD_HHMMSS.csv` - Linearity metrics (DAP vs DMM analysis)
+- `vtarget_linearity_YYYYMMDD_HHMMSS.png` - Visualization plots (3-panel with DMM comparison)
+
 ## Test Scenarios
 
 ### Scenario 1: Basic USB Functionality
@@ -199,6 +379,61 @@ python test_xiao_wifi.py --host dap.local --port 3240
 - Target ARM Cortex-M MCU
 - Connection wires (SWDIO, SWCLK, GND, VTarget)
 
+### Scenario 6: VTarget Linearity Calibration
+**Objective:** Characterize and verify VTarget output linearity across full voltage range with precision DMM reference
+
+1. Connect XIAO to PC via USB (required for VTarget power)
+2. Connect Keysight DMM to VTarget output:
+   - DMM HI (red) → VTarget (GPIO3 output)
+   - DMM LO (black) → GND
+3. Connect DMM to PC via USB or LAN
+4. Find DMM VISA resource: `python -m pyvisa-shell` then `list`
+5. Run test: `python test_vtarget_linearity.py -n 30 -m 15 -d "USB0::0x2A8D::0x1301::MY********::INSTR"`
+6. Verify R² > 0.99 (DAP vs Setpoint) and R² > 0.995 (DAP vs DMM)
+7. Review CSV data for calibration coefficients
+8. Examine plot for visual confirmation
+
+**Required Hardware:**
+- XIAO ESP32-C3 module
+- USB-C cable (must provide sufficient current for VTarget)
+- Keysight 34460A/34461A/34465A/34470A DMM
+- BNC or banana plug cables (2x)
+- USB cable for DMM or Ethernet connection
+
+**Optional Hardware:**
+- DMM test leads with fine probes
+- Kelvin clips for improved connection
+- Shielded cables to reduce noise
+
+**Best Practices:**
+- **Allow 5-minute warmup before testing** (both DAP and DMM)
+- Keep ambient temperature stable (±2°C)
+- Use quality USB cable with good power delivery
+- Run DMM auto-calibration before testing (*CAL?)
+- Use DMM 10 NPLC setting for lowest noise
+- Shield cables from switching power supplies
+- Ground DMM and DAP to same reference
+- Run multiple test cycles and compare results
+- Store CSV files for batch comparison across units
+- Verify DMM calibration certificate is current
+
+**DMM Configuration Details:**
+- The script automatically configures the DMM:
+  - Reset to known state (*RST)
+  - DC Voltage mode, 10V range
+  - 100µV resolution (0.0001V)
+  - 10 NPLC integration (low noise, ~167ms @ 60Hz)
+  - Auto-zero disabled for speed
+- DMM provides traceable reference for DAP calibration
+- Typical DMM accuracy: ±(0.0035% + 0.0005%) of reading
+- DAP accuracy evaluated against DMM reference
+
+**Interpreting DMM Results:**
+- **DAP vs Setpoint**: Overall system performance
+- **DAP vs DMM**: True DAP accuracy (removes setpoint errors)
+- **DMM vs Setpoint**: PWM generator accuracy
+- **Target**: DAP vs DMM error < 1% across full range
+
 ## Troubleshooting
 
 ### USB Test Issues
@@ -236,6 +471,59 @@ python test_xiao_wifi.py --host dap.local --port 3240
 - **Solution:** Reduce WiFi congestion (change channel)
 - **Solution:** Check for interference
 
+### Linearity Test Issues
+
+**Problem:** "No DAP probes found"
+- **Solution:** Ensure USB connection is established
+- **Solution:** Install WinUSB driver using Zadig (Windows)
+- **Solution:** Verify USB cable supports data transfer (not charge-only)
+
+**Problem:** "Poor linearity (R² < 0.99)"
+- **Solution:** Allow adequate warmup time (5+ minutes)
+- **Solution:** Check USB power supply quality
+- **Solution:** Verify VTarget PWM output is not loaded
+- **Solution:** Test with external precision power supply
+- **Solution:** Check for noise on ADC input (GPIO2)
+
+**Problem:** "High measurement noise (StdDev > 10mV)"
+- **Solution:** Reduce electromagnetic interference sources
+- **Solution:** Improve grounding connections
+- **Solution:** Increase samples per point: `-m 20` or higher
+- **Solution:** Use shielded cables for measurements
+
+**Problem:** "Voltage setpoint rejected"
+- **Solution:** Verify voltage is within 1250-5000mV range
+- **Solution:** Check VTarget power supply can provide required current
+- **Solution:** Ensure USB port provides adequate power (500mA+)
+
+**Problem:** "numpy/scipy not available"
+- **Solution:** Install analysis libraries: `pip install numpy scipy matplotlib`
+- **Solution:** Script will run with basic statistics if scipy unavailable
+- **Solution:** Advanced metrics (R², DNL, INL) require scipy
+
+**Problem:** "Cannot connect to DMM" or "DMM not found"
+- **Solution:** Install PyVISA: `pip install pyvisa pyvisa-py`
+- **Solution:** Find DMM resource string: `python -m pyvisa-shell` then type `list`
+- **Solution:** For USB DMM, install libusb: `pip install pyusb`
+- **Solution:** Check DMM is powered on and USB/LAN cable connected
+- **Solution:** Try NI-VISA instead of pyvisa-py for better compatibility
+- **Solution:** Verify DMM is in local mode (not remote locked)
+
+**Problem:** "DMM measurements have high noise"
+- **Solution:** Increase integration time (script uses 10 NPLC by default)
+- **Solution:** Run DMM auto-calibration: Send `*CAL?` command
+- **Solution:** Use shielded cables for DMM connections
+- **Solution:** Verify DMM and DAP share common ground
+- **Solution:** Move away from switching power supplies
+- **Solution:** Allow longer settling time between voltage changes
+
+**Problem:** "DAP vs DMM error > 1%"
+- **Solution:** Check voltage divider resistor values (should be 1% tolerance)
+- **Solution:** Verify ADC calibration in firmware
+- **Solution:** Check for voltage drop in VTarget output path
+- **Solution:** Ensure adequate USB power supply current
+- **Solution:** Calibrate DAP using DMM measurements as reference
+
 ## Interpreting Results
 
 ### Test Status Codes
@@ -257,6 +545,23 @@ python test_xiao_wifi.py --host dap.local --port 3240
 **USB Connection:**
 - Device must be detected within 5 seconds
 - Vendor commands must respond within 1 second
+
+**VTarget Linearity:**
+- R² (coefficient of determination) > 0.99
+- Maximum error < 2% across full range
+- Standard deviation < 10mV per measurement point
+- DNL (Differential Non-Linearity) < 1%
+- INL (Integral Non-Linearity) < 15mV
+
+**Statistical Metrics Interpretation:**
+- **R² = 1.0**: Perfect linear relationship
+- **R² > 0.999**: Excellent linearity, production-ready
+- **R² > 0.99**: Good linearity, acceptable for most applications
+- **R² < 0.99**: Poor linearity, investigate hardware issues
+- **Slope ≈ 1.0**: Accurate voltage transfer (ideal: 1.0)
+- **Intercept ≈ 0**: Minimal offset error (ideal: 0mV)
+- **DNL**: Step-to-step uniformity (< 0.5% is excellent)
+- **INL**: Maximum deviation from ideal line (< 10mV is excellent)
 
 ## Advanced Usage
 
@@ -287,6 +592,77 @@ ip = test.test_dns_resolution()
 while True:
     test.test_latency(ip, samples=5)
     time.sleep(5)
+```
+
+### Automated Linearity Calibration
+```python
+from test_vtarget_linearity import VTargetLinearityTest
+
+# Create test instance
+test = VTargetLinearityTest()
+
+# Connect to probe
+if test.connect():
+    # Run comprehensive 50-point test with 20 samples each
+    test.test_full_range(num_points=50)
+    test.MEASUREMENT_SAMPLES = 20
+    
+    # Calculate statistics
+    stats = test.calculate_linearity_statistics()
+    
+    # Save results
+    test.save_results_csv()
+    test.save_statistics_csv(stats)
+    test.plot_results()
+    
+    # Disconnect
+    test.disconnect()
+    
+    # Check pass/fail
+    if stats['r_squared'] > 0.99 and abs(stats['max_error_percent']) < 2.0:
+        print("✓ CALIBRATION PASSED")
+    else:
+        print("✗ CALIBRATION FAILED")
+```
+
+### Batch Testing Multiple Units
+```python
+from test_vtarget_linearity import VTargetLinearityTest
+import time
+
+# List of probe serial numbers
+probes = ["SN001", "SN002", "SN003"]
+
+results_summary = []
+
+for serial in probes:
+    print(f"\nTesting probe: {serial}")
+    test = VTargetLinearityTest(serial_number=serial)
+    
+    if test.connect():
+        test.test_full_range(num_points=30)
+        stats = test.calculate_linearity_statistics()
+        
+        # Save with unit-specific filename
+        test.save_results_csv(f"linearity_{serial}.csv")
+        test.save_statistics_csv(stats, f"stats_{serial}.csv")
+        
+        results_summary.append({
+            'serial': serial,
+            'r_squared': stats['r_squared'],
+            'max_error_percent': stats['max_error_percent']
+        })
+        
+        test.disconnect()
+        time.sleep(2)
+
+# Print batch summary
+print("\n" + "="*60)
+print("Batch Test Summary")
+print("="*60)
+for result in results_summary:
+    status = "PASS" if result['r_squared'] > 0.99 and abs(result['max_error_percent']) < 2.0 else "FAIL"
+    print(f"{result['serial']}: R²={result['r_squared']:.6f}, MaxErr={result['max_error_percent']:.2f}% [{status}]")
 ```
 
 ## Contributing

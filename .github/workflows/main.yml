@@ -16,7 +16,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    continue-on-error: true
     strategy:
       matrix:
         target-hardware: [esp8266, esp32, esp32c3, esp32s3]
@@ -96,10 +95,15 @@ jobs:
 
     - name: Report firmware sizes
       run: |
-        echo "## Firmware Sizes - ${{ matrix.target-hardware }}" >> $GITHUB_STEP_SUMMARY
-        echo "| File | Size |" >> $GITHUB_STEP_SUMMARY
-        echo "|------|------|" >> $GITHUB_STEP_SUMMARY
-        ls -lh build/wireless_esp_dap_full.bin build/wireless_esp_dap_app.bin | awk '{print "| " $9 " | " $5 " |"}' >> $GITHUB_STEP_SUMMARY
+        if [ -f build/wireless_esp_dap_full.bin ] && [ -f build/wireless_esp_dap_app.bin ]; then
+          echo "## Firmware Sizes - ${{ matrix.target-hardware }}" >> $GITHUB_STEP_SUMMARY
+          echo "| File | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|" >> $GITHUB_STEP_SUMMARY
+          ls -lh build/wireless_esp_dap_full.bin build/wireless_esp_dap_app.bin | awk '{print "| " $9 " | " $5 " |"}' >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## Firmware Sizes - ${{ matrix.target-hardware }}" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ Firmware files not found (merge may have failed)" >> $GITHUB_STEP_SUMMARY
+        fi
 
     - name: Upload firmware
       uses: actions/upload-artifact@v4

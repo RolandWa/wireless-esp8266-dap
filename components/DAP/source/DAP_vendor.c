@@ -31,10 +31,8 @@
 
 // VTarget sensing is only available on ESP32/ESP32-C3/ESP32-S3
 #if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
-#include "esp_adc/adc_oneshot.h"
-#include "esp_adc/adc_cali.h"
-#include "esp_adc/adc_cali_scheme.h"
-#include "hal/adc_types.h"
+#include "driver/adc.h"
+#include "esp_adc_cal.h"
 
 // Include VTarget PWM control for ESP32-C3
 #ifdef CONFIG_IDF_TARGET_ESP32C3
@@ -42,8 +40,7 @@
 #endif
 #endif
 
-static adc_oneshot_unit_handle_t adc1_handle = NULL;
-static adc_cali_handle_t adc1_cali_handle = NULL;
+static esp_adc_cal_characteristics_t *adc_chars = NULL;
 static bool adc_initialized = false;
 
 // Initialize ADC for VTarget measurement on GPIO2 (ADC1_CHANNEL_2)
@@ -52,29 +49,17 @@ static void vtarget_adc_init(void) {
         return;
     }
     
-    // Configure ADC1
-    adc_oneshot_unit_init_cfg_t init_config = {
-        .unit_id = ADC_UNIT_1,
-    };
-    ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config, &adc1_handle));
+    // Configure ADC1 width (12-bit resolution)
+    adc1_config_width(ADC_WIDTH_BIT_12);
     
-    // Configure ADC1 Channel 2 (GPIO2)
-    adc_oneshot_chan_cfg_t config = {
-        .bitwidth = ADC_BITWIDTH_DEFAULT,
-        .atten = ADC_ATTEN_DB_11,  // 0-3.3V range
-    };
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_2, &config));
+    // Configure ADC1 Channel 2 (GPIO2) with 11dB attenuation (0-3.3V range)
+    adc1_config_channel_atten(ADC1_CHANNEL_2, ADC_ATTEN_DB_11);
     
-    // Setup calibration
-    adc_cali_curve_fitting_config_t cali_config = {
-        .unit_id = ADC_UNIT_1,
-        .atten = ADC_ATTEN_DB_11,
-        .bitwidth = ADC_BITWIDTH_DEFAULT,
-    };
-    esp_err_t ret = adc_cali_create_scheme_curve_fitting(&cali_config, &adc1_cali_handle);
-    if (ret == ESP_OK) {
-        adc_initialized = true;
-    }
+    // Characterize ADC for calibration
+    adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
+    esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, adc_chars);
+    
+    adc_initialized = true;
 }
 
 // Read VTarget voltage in millivolts (compensated for 1/2 voltage divider)
@@ -84,7 +69,7 @@ static uint16_t vtarget_read_mv(void) {
         vtarget_adc_init();
     }
     
-    if (!adc1_handle) {
+    if (!adc_chars) {
         return 0;
     }
     
@@ -93,25 +78,14 @@ static uint16_t vtarget_read_mv(void) {
     
     // Read ADC 20 times and average
     for (int i = 0; i < 20; i++) {
-        int adc_raw = 0;
-        int voltage_mv = 0;
+        int adc_raw = adc1_get_raw(ADC1_CHANNEL_2);
         
-        // Read ADC
-        esp_err_t ret = adc_oneshot_read(adc1_handle, ADC_CHANNEL_2, &adc_raw);
-        if (ret != ESP_OK) {
+        if (adc_raw < 0) {
             continue;
         }
         
-        // Convert to voltage
-        if (adc1_cali_handle) {
-            ret = adc_cali_raw_to_voltage(adc1_cali_handle, adc_raw, &voltage_mv);
-            if (ret != ESP_OK) {
-                continue;
-            }
-        } else {
-            // Fallback without calibration
-            voltage_mv = adc_raw * 3300 / 4095;
-        }
+        // Convert to voltage using calibration
+        uint32_t voltage_mv = esp_adc_cal_raw_to_voltage(adc_raw, adc_chars);
         
         voltage_sum += voltage_mv;
         valid_samples++;

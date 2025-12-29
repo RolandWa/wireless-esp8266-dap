@@ -20,13 +20,14 @@ on:
 
 jobs:
   analyze:
-    name: Analyze
+    name: Analyze (${{ matrix.target }})
     runs-on: ubuntu-20.04
 
     strategy:
       fail-fast: false
       matrix:
         language: [ 'cpp' ]
+        target: [ 'esp8266', 'esp32', 'esp32c3', 'esp32s3' ]
         # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby' ]
         # Learn more about CodeQL language support at https://git.io/codeql-language-support
 
@@ -60,14 +61,14 @@ jobs:
     #    uses a compiled language
 
     - if: matrix.language == 'cpp' || matrix.language == 'c'
-      name: Build
+      name: Build (${{ matrix.target }})
       run: |
         sudo apt-get install git wget flex bison gperf python3 python3-pip python3-venv cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0
         wget https://github.com/espressif/esp-idf/releases/download/v4.2.2/esp-idf-v4.2.2.zip
         unzip esp-idf-v4.2.2.zip
-        ./esp-idf-v4.2.2/install.sh esp32
+        ./esp-idf-v4.2.2/install.sh ${{ matrix.target }}
         . ./esp-idf-v4.2.2/export.sh
-        idf.py set-target esp32
+        idf.py set-target ${{ matrix.target }}
         idf.py build
 
     - name: Perform CodeQL Analysis
