@@ -179,10 +179,11 @@ This information includes:
 
 /// Indicate that UART Communication Port is available.
 /// This information is returned by the command \ref DAP_Info as part of <b>Capabilities</b>.
-#if defined(CONFIG_IDF_TARGET_ESP8266)
-#define DAP_UART                0               ///< DAP UART:  1 = available, 0 = not available (disabled for ESP8266).
+/// Disabled for ESP8266 and ESP32 (require ARM CMSIS drivers). Enabled for ESP32-C3 and ESP32-S3.
+#if defined(CONFIG_IDF_TARGET_ESP8266) || defined(CONFIG_IDF_TARGET_ESP32)
+#define DAP_UART                0               ///< DAP UART:  1 = available, 0 = not available.
 #else
-#define DAP_UART                1               ///< DAP UART:  1 = available, 0 = not available.
+#define DAP_UART                1               ///< DAP UART:  1 = available, 0 = not available (ESP32-C3, ESP32-S3).
 #endif
 
 /// USART Driver instance number for the UART Communication Port.
