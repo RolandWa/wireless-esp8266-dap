@@ -46,6 +46,14 @@ static const char *TAG = "DAP_vendor";
 static esp_adc_cal_characteristics_t *adc_chars = NULL;
 static bool adc_initialized = false;
 
+#else
+// Provide weak stub for platforms without VTarget support
+__attribute__((weak)) esp_err_t vtarget_set_voltage(uint16_t voltage_mv) {
+    (void)voltage_mv;
+    return ESP_ERR_NOT_SUPPORTED;
+}
+#endif
+
 // Cleanup ADC resources
 __attribute__((unused))
 static void vtarget_adc_deinit(void) {

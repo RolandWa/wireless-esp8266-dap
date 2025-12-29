@@ -5,6 +5,7 @@ set(COMPONENT_SRCS
     "./source/JTAG_DP.c"
     "./source/SW_DP.c"
     "./source/SWO.c"
+    "./source/UART.c"
     "./source/spi_op.c"
     "./source/spi_switch.c"
     "./source/dap_utility.c"
