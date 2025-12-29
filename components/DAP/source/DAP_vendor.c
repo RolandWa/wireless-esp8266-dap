@@ -35,14 +35,25 @@
 #if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
+#include "esp_log.h"
 
 // Include VTarget PWM control for ESP32-C3
 #ifdef CONFIG_IDF_TARGET_ESP32C3
 #include "main/vtarget_pwm.h"
 #endif
 
+static const char *TAG = "DAP_vendor";
 static esp_adc_cal_characteristics_t *adc_chars = NULL;
 static bool adc_initialized = false;
+
+// Cleanup ADC resources
+static void vtarget_adc_deinit(void) {
+    if (adc_chars) {
+        free(adc_chars);
+        adc_chars = NULL;
+    }
+    adc_initialized = false;
+}
 
 // Initialize ADC for VTarget measurement on GPIO2 (ADC1_CHANNEL_2)
 static void vtarget_adc_init(void) {
@@ -58,20 +69,28 @@ static void vtarget_adc_init(void) {
     
     // Characterize ADC for calibration
     adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
+    if (!adc_chars) {
+        ESP_LOGE(TAG, "Failed to allocate ADC calibration memory");
+        return;
+    }
+    
     esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, adc_chars);
     
     adc_initialized = true;
+    ESP_LOGI(TAG, "VTarget ADC initialized on GPIO2 (ADC1_CH2), calibration type: %d", val_type);
 }
 
 // Read VTarget voltage in millivolts (compensated for 1/2 voltage divider)
 // Takes 20 samples and returns the average for better accuracy
+// Returns 0xFFFF on error
 static uint16_t vtarget_read_mv(void) {
     if (!adc_initialized) {
         vtarget_adc_init();
     }
     
     if (!adc_chars) {
-        return 0;
+        ESP_LOGE(TAG, "ADC not initialized or calibration failed");
+        return 0xFFFF;  // Error indicator
     }
     
     uint32_t voltage_sum = 0;
@@ -93,12 +112,16 @@ static uint16_t vtarget_read_mv(void) {
     }
     
     if (valid_samples == 0) {
-        return 0;
+        ESP_LOGW(TAG, "No valid ADC samples obtained");
+        return 0xFFFF;  // Error indicator
     }
     
     // Calculate average and compensate for 1/2 voltage divider (multiply by 2)
     uint16_t avg_voltage = (uint16_t)(voltage_sum / valid_samples);
-    return avg_voltage * 2;
+    uint16_t result = avg_voltage * 2;
+    
+    ESP_LOGD(TAG, "VTarget read: %d mV (raw avg: %d mV, samples: %d)", result, avg_voltage, valid_samples);
+    return result;
 }
 #endif // ESP32/ESP32-C3/ESP32-S3
 
@@ -142,11 +165,12 @@ uint32_t DAP_ProcessVendorCommand(const uint8_t *request, uint8_t *response) {
         *response++ = (uint8_t)(voltage_mv & 0xFF);        // Low byte
         *response++ = (uint8_t)((voltage_mv >> 8) & 0xFF); // High byte
         num += 2;  // 2 bytes in response
+        // Note: 0xFFFF (65535) indicates read error
       }
 #else
       // VTarget sensing not supported on this target
-      *response++ = 0x00;  // Return 0V for unsupported platforms
-      *response++ = 0x00;
+      *response++ = 0xFF;  // Return 0xFFFF to indicate not supported
+      *response++ = 0xFF;
       num += 2;
 #endif
       break;
@@ -157,14 +181,18 @@ uint32_t DAP_ProcessVendorCommand(const uint8_t *request, uint8_t *response) {
         num += 2U << 16;  // 2 bytes in request (voltage low, high)
         uint16_t voltage_mv = (uint16_t)(*request++) | ((uint16_t)(*request++) << 8);
         
+        ESP_LOGI(TAG, "Set VTarget request: %d mV", voltage_mv);
         esp_err_t ret = vtarget_set_voltage(voltage_mv);
         
         if (ret == ESP_OK) {
           *response++ = 0x00;  // Success
+          ESP_LOGI(TAG, "VTarget set successfully to %d mV", voltage_mv);
         } else if (ret == ESP_ERR_INVALID_ARG) {
           *response++ = 0x01;  // Invalid voltage range (not 1250-5000 mV)
+          ESP_LOGW(TAG, "Invalid voltage range: %d mV (valid: 1250-5000 mV)", voltage_mv);
         } else {
           *response++ = 0xFF;  // Other error
+          ESP_LOGE(TAG, "Failed to set VTarget: %s", esp_err_to_name(ret));
         }
         num += 1;  // 1 byte status response
       }
