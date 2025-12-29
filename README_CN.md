@@ -173,14 +173,20 @@
 
 --------------
 
-| Other              |               |
-|--------------------|---------------|
-| LED\_WIFI\_STATUS  | GPIO10        |
-| Tx                 | GPIO19        |
-| Rx                 | GPIO18        |
+| Other                  |               |
+|-----------------------|---------------|
+| LED\_WIFI\_STATUS      | GPIO10        |
+| VTarget Sense          | GPIO2 (ADC0)  |
+| VTarget Control (PWM)  | GPIO3         |
+| Tx                     | GPIO19        |
+| Rx                     | GPIO18        |
 
 
 > Rx和Tx用于TCP转发的串口，默认不开启该功能。
+> 
+> VTarget通过GPIO2 (ADC0)上的1/2分压器进行感应。使用DAP供应商命令0x81读取目标电压。
+> 
+> VTarget电压可以通过GPIO3上的PWM控制（1.25V-5.0V范围）。使用DAP供应商命令0x82设置目标电压。
 
 
 </details>

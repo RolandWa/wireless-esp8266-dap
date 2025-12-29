@@ -184,15 +184,18 @@ There is built-in ipv4 only mDNS server. You can access the device using `dap.lo
 
 | Other              |               |
 |--------------------|---------------|
-| LED\_WIFI\_STATUS  | GPIO10        |
-| VTarget Sense      | GPIO2 (ADC0)  |
-| Tx                 | GPIO21        |
-| Rx                 | GPIO20        |
+| LED\_WIFI\_STATUS      | GPIO10        |
+| VTarget Sense          | GPIO2 (ADC0)  |
+| VTarget Control (PWM)  | GPIO3         |
+| Tx                     | GPIO21        |
+| Rx                     | GPIO20        |
 
 
 > Rx and Tx is used for uart bridge, not enabled by default.
 > 
 > VTarget is sensed via a 1/2 voltage divider on GPIO2 (ADC0). Use DAP Vendor Command 0x81 to read target voltage.
+> 
+> VTarget voltage can be controlled via PWM on GPIO3 (1.25V-5.0V range). Use DAP Vendor Command 0x82 to set target voltage.
 > 
 > **Note for XIAO-ESP32-C3:** UART pins are GPIO21 (D6/TX) and GPIO20 (D7/RX).
 
@@ -319,29 +322,58 @@ python ./idf.py -p /dev/ttyS5 flash
 
 
 <details>
-<summary>ESP32/ESP32C3</summary>
+<summary>ESP32/ESP32C3/ESP32S3</summary>
 
-1. Get esp-idf
+1. Get ESP-IDF
 
-    For now, please use esp-idf v4.4.2 : https://github.com/espressif/esp-idf/releases/tag/v4.4.2
+    For now, please use ESP-IDF v4.4.2 or later: https://github.com/espressif/esp-idf/releases/tag/v4.4.2
+    
+    Installation guides:
+    - Linux/macOS: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/linux-macos-setup.html
+    - Windows: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/windows-setup.html
 
 2. Build & Flash
 
     Build with ESP-IDF build system.
     More information can be found at the following link: [Build System](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html "Build System")
 
-The following example shows a possible way to build:
+**Linux/macOS:**
 
 ```bash
-# Set build target
-idf.py set-target esp32
+# Set build target (choose one)
+idf.py set-target esp32      # For ESP32
+idf.py set-target esp32c3    # For ESP32-C3
+idf.py set-target esp32s3    # For ESP32-S3
+
 # Build
 idf.py build
-# Flash
-idf.py -p /dev/ttyS5 flash
+
+# Flash (replace with your port, e.g., /dev/ttyUSB0, /dev/ttyACM0)
+idf.py -p /dev/ttyUSB0 flash
+
+# Optional: Monitor serial output
+idf.py -p /dev/ttyUSB0 monitor
 ```
 
-> The `idf.py` in the project root directory is only applicable to the old ESP8266 target. Don't use it in ESP32.
+**Windows:**
+
+```bash
+# Set build target (choose one)
+idf.py set-target esp32      # For ESP32
+idf.py set-target esp32c3    # For ESP32-C3
+idf.py set-target esp32s3    # For ESP32-S3
+
+# Build
+idf.py build
+
+# Flash (replace COM5 with your port)
+idf.py -p COM5 flash
+
+# Optional: Monitor serial output
+idf.py -p COM5 monitor
+```
+
+> **Note:** The `idf.py` in the project root directory is only applicable to the old ESP8266 target. For ESP32/ESP32-C3/ESP32-S3, use the `idf.py` from your ESP-IDF installation (should be in your PATH after running `export.sh` on Linux/macOS or using the ESP-IDF command prompt on Windows).
 
 </details>
 
