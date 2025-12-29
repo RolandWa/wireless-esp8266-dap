@@ -1,0 +1,16 @@
+# Python requirements for XIAO ESP32-C3 hardware tests
+
+# PyOCD - ARM Cortex-M debugging
+pyocd>=0.35.0
+
+# USB/HID access (Windows)
+pywinusb>=0.4.2; sys_platform == 'win32'
+
+# USB/HID access (Linux/Mac)
+hidapi>=0.14.0; sys_platform != 'win32'
+
+# Serial port access (for UART tests)
+pyserial>=3.5
+
+# Optional: USBIP protocol
+# usbip  # Not available on PyPI - manual installation required
