@@ -36,23 +36,11 @@
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
 #include "esp_log.h"
-
-// Include VTarget PWM control for ESP32 variants
-#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
 #include "main/vtarget_pwm.h"
-#endif
 
 static const char *TAG = "DAP_vendor";
 static esp_adc_cal_characteristics_t *adc_chars = NULL;
 static bool adc_initialized = false;
-
-#else
-// Provide weak stub for platforms without VTarget support
-__attribute__((weak)) esp_err_t vtarget_set_voltage(uint16_t voltage_mv) {
-    (void)voltage_mv;
-    return ESP_ERR_NOT_SUPPORTED;
-}
-#endif
 
 // Cleanup ADC resources
 __attribute__((unused))
@@ -131,6 +119,13 @@ static uint16_t vtarget_read_mv(void) {
     
     ESP_LOGD(TAG, "VTarget read: %d mV (raw avg: %d mV, samples: %d)", result, avg_voltage, valid_samples);
     return result;
+}
+
+#else
+// Provide weak stub for platforms without VTarget support
+__attribute__((weak)) esp_err_t vtarget_set_voltage(uint16_t voltage_mv) {
+    (void)voltage_mv;
+    return ESP_ERR_NOT_SUPPORTED;
 }
 #endif // ESP32/ESP32-C3/ESP32-S3
 
