@@ -258,6 +258,10 @@ A complete hardware design for the Seeed Studio XIAO ESP32-C3 module is availabl
 
 **Schematic PDF:** [circuit_ESP32C3_Xiao/documentations/ESP32C3_Xiao_wireless_DAP.pdf](circuit_ESP32C3_Xiao/documentations/ESP32C3_Xiao_wireless_DAP.pdf)
 
+**Schematic Diagram:**
+
+![ESP32C3 XIAO Schematic](circuit_ESP32C3_Xiao/documentations/ESP32C3_Xiao_wireless_DAP.svg)
+
 **Additional Documentation:** [circuit_ESP32C3_Xiao/doc/](circuit_ESP32C3_Xiao/doc/) includes ARM JTAG connector pinouts and component datasheets
 
 **PCBA Preview:**

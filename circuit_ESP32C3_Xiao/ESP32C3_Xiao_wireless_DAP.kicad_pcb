@@ -9,7 +9,7 @@
 	(paper "A4")
 	(title_block
 		(title "Xiao_ESP32C3_wireless_DAP")
-		(date "2025-11-26")
+		(date "2025-12-29")
 		(rev "0.1")
 	)
 	(layers
@@ -474,7 +474,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900179919"
+		(property "LCSC" "C114640"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -737,6 +737,18 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C2099"
+			(at 0 0 0)
+			(layer "F.SilkS")
+			(hide yes)
+			(uuid "035c4165-3daf-49b8-b22f-a75441e59357")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -1024,7 +1036,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C93943"
+		(property "LCSC" "C114659"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -1239,7 +1251,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900019212"
+		(property "LCSC" "C9900224280"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -1971,7 +1983,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900019212"
+		(property "LCSC" "C9900224280"
 			(at 0 0 90)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -2436,7 +2448,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900019212"
+		(property "LCSC" "C9900224280"
 			(at 0 0 270)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -2651,7 +2663,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900199398"
+		(property "LCSC" "C163424"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -3513,7 +3525,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C93943"
+		(property "LCSC" "C114659"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -3728,7 +3740,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900199398"
+		(property "LCSC" "C9900170064"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -3943,7 +3955,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C853859"
+		(property "LCSC" "C98220"
 			(at 0 0 90)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -5140,7 +5152,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900206920"
+		(property "LCSC" "C114640"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -5355,7 +5367,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900206920"
+		(property "LCSC" "C114640"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -5568,7 +5580,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900199398"
+		(property "LCSC" "C9900083237"
 			(at 0 0 90)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -5782,7 +5794,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900206920"
+		(property "LCSC" "C114640"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -5997,7 +6009,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C93943"
+		(property "LCSC" "C114659"
 			(at 0 0 90)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -6265,7 +6277,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900145379"
+		(property "LCSC" "C699298"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -7209,7 +7221,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900199399"
+		(property "LCSC" "C114614"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -7706,7 +7718,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900206920"
+		(property "LCSC" "C114640"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -7921,7 +7933,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900199399"
+		(property "LCSC" "C22356636"
 			(at 0 0 270)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -8130,6 +8142,18 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "2c626122-a708-4e52-ad18-c1d694c00c2a")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C9900010269"
+			(at 0 0 0)
+			(layer "F.SilkS")
+			(hide yes)
+			(uuid "fbec52e8-2230-48b8-be09-201b1f4499c9")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8808,7 +8832,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900206920"
+		(property "LCSC" "C114640"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -9023,7 +9047,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900199399"
+		(property "LCSC" "C22356636"
 			(at 0 0 270)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -10002,7 +10026,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C11925"
+		(property "LCSC" "C2907032"
 			(at 0 0 90)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -10217,7 +10241,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900206920"
+		(property "LCSC" "C114640"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -10999,7 +11023,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C9900206920"
+		(property "LCSC" "C114640"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
