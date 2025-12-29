@@ -1,6 +1,7 @@
 #include "sdkconfig.h"
 
 #include <string.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <sys/param.h>
 
@@ -31,6 +32,9 @@
 
 static EventGroupHandle_t wifi_event_group;
 static int ssid_index = 0;
+static int retry_count = 0;
+static bool ap_mode = false;
+#define MAX_RETRY_PER_NETWORK 5  // Try each network 5 times
 
 const int IPV4_GOTIP_BIT = BIT0;
 #ifdef CONFIG_EXAMPLE_IPV6
@@ -60,6 +64,10 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
         os_printf("SYSTEM EVENT STA GOT IP : %s\r\n", ip4addr_ntoa(&event->event_info.got_ip.ip_info.ip));
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
+        if (ap_mode) {
+            break;  // Don't try to reconnect if we're in AP mode
+        }
+        
         GPIO_SET_LEVEL_LOW(PIN_LED_WIFI_STATUS);
 
         os_printf("Disconnect reason : %d\r\n", (int)info->disconnected.reason);
@@ -71,7 +79,9 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
         }
 #endif
         ssid_change();
-        esp_wifi_connect();
+        if (!ap_mode) {  // Only reconnect if not switched to AP mode
+            esp_wifi_connect();
+        }
         xEventGroupClearBits(wifi_event_group, IPV4_GOTIP_BIT);
 #ifdef CONFIG_EXAMPLE_IPV6
         xEventGroupClearBits(wifi_event_group, IPV6_GOTIP_BIT);
@@ -96,8 +106,52 @@ static esp_err_t event_handler(void *ctx, system_event_t *event) {
 }
 
 static void ssid_change() {
-    if (ssid_index > WIFI_LIST_SIZE - 1) {
-        ssid_index = 0;
+    retry_count++;
+    
+    // After MAX_RETRY_PER_NETWORK attempts for this SSID, move to next
+    if (retry_count >= MAX_RETRY_PER_NETWORK) {
+        retry_count = 0;
+        ssid_index++;
+        
+        // If we've tried all SSIDs, switch to AP mode using second entry
+        if (ssid_index >= WIFI_LIST_SIZE) {
+            os_printf("Failed to connect to any network after %d attempts each. Creating AP...\r\n", MAX_RETRY_PER_NETWORK);
+            
+            // Stop current connection attempts
+            esp_wifi_disconnect();
+            esp_wifi_stop();
+            
+            // Configure AP mode using wifi_list[1] (second entry)
+            wifi_config_t ap_config = {
+                .ap = {
+                    .ssid = "",
+                    .password = "",
+                    .ssid_len = 0,
+                    .channel = 1,
+                    .authmode = WIFI_AUTH_WPA2_PSK,
+                    .max_connection = 4,
+                    .beacon_interval = 100,
+                },
+            };
+            
+            // Use the second entry from wifi_list for AP credentials
+            strcpy((char *)ap_config.ap.ssid, wifi_list[1].ssid);
+            strcpy((char *)ap_config.ap.password, wifi_list[1].password);
+            ap_config.ap.ssid_len = strlen(wifi_list[1].ssid);
+            
+            ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+            ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &ap_config));
+            ESP_ERROR_CHECK(esp_wifi_start());
+            
+            ap_mode = true;
+            GPIO_SET_LEVEL_HIGH(PIN_LED_WIFI_STATUS);
+            os_printf("AP Mode: SSID='%s', Password='%s', IP=192.168.4.1\r\n", 
+                      wifi_list[1].ssid, wifi_list[1].password);
+            
+            // Set the IPV4_GOTIP_BIT to unblock wait_for_ip()
+            xEventGroupSetBits(wifi_event_group, IPV4_GOTIP_BIT);
+            return;
+        }
     }
 
     wifi_config_t wifi_config = {
@@ -109,7 +163,8 @@ static void ssid_change() {
 
     strcpy((char *)wifi_config.sta.ssid, wifi_list[ssid_index].ssid);
     strcpy((char *)wifi_config.sta.password, wifi_list[ssid_index].password);
-    ssid_index++;
+    os_printf("Trying to connect to: %s (attempt %d/%d)\r\n", 
+              wifi_list[ssid_index].ssid, retry_count + 1, MAX_RETRY_PER_NETWORK);
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
 }
 
