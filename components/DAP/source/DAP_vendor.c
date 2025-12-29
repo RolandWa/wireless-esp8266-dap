@@ -176,7 +176,7 @@ uint32_t DAP_ProcessVendorCommand(const uint8_t *request, uint8_t *response) {
       break;
 
     case ID_DAP_Vendor2:  // Set VTarget voltage (1250-5000 mV)
-#ifdef CONFIG_IDF_TARGET_ESP32C3
+#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
       {
         num += 2U << 16;  // 2 bytes in request (voltage low, high)
         uint16_t voltage_mv = (uint16_t)(*request++) | ((uint16_t)(*request++) << 8);

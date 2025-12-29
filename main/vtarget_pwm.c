@@ -51,7 +51,11 @@ esp_err_t vtarget_pwm_init(void)
         .duty_resolution = VTARGET_PWM_RESOLUTION,
         .timer_num = VTARGET_PWM_TIMER,
         .freq_hz = VTARGET_PWM_FREQUENCY,
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 4, 0)
         .clk_cfg = LEDC_AUTO_CLK
+#else
+        .clk_cfg = LEDC_USE_APB_CLK  // Fallback for older ESP-IDF versions
+#endif
     };
     ret = ledc_timer_config(&timer_conf);
     if (ret != ESP_OK) {
