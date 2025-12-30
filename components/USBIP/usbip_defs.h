@@ -28,9 +28,16 @@
 
 enum usbip_stage1_command
 {
-    // Offset 2
-    USBIP_STAGE1_CMD_DEVICE_LIST = 0x05,   // OP_REQ_DEVLIST
-    USBIP_STAGE1_CMD_DEVICE_ATTACH = 0x03, // OP_REQ_IMPORT
+    // USB/IP v1.1.1 Protocol - Offset 2 in header
+    // Request codes (from client)
+    USBIP_STAGE1_REQ_DEVLIST = 0x8005,   // OP_REQ_DEVLIST - Request device list
+    USBIP_STAGE1_REQ_IMPORT = 0x8003,    // OP_REQ_IMPORT - Request device import
+    // Reply codes (from server)
+    USBIP_STAGE1_REP_DEVLIST = 0x0005,   // OP_REP_DEVLIST - Reply with device list
+    USBIP_STAGE1_REP_IMPORT = 0x0003,    // OP_REP_IMPORT - Reply to import
+    // Legacy aliases for compatibility
+    USBIP_STAGE1_CMD_DEVICE_LIST = 0x05,   // Low byte only (legacy)
+    USBIP_STAGE1_CMD_DEVICE_ATTACH = 0x03, // Low byte only (legacy)
 };
 
 enum usbip_stager2_command

@@ -145,12 +145,11 @@ void app_main() {
                             DAP_TASK_AFFINITY);
 
 #if defined CONFIG_IDF_TARGET_ESP8266
-    #define UART_BRIDGE_TASK_STACK_SIZE 1024
+    #define UART_BRIDGE_TASK_STACK_SIZE 2048  // Increased from 1024 to prevent stack overflow
 #else
     #define UART_BRIDGE_TASK_STACK_SIZE 2048
 #endif
 
-    //// FIXME: potential stack overflow
 #if (USE_UART_BRIDGE == 1)
     xTaskCreate(uart_bridge_task, "uart_server", UART_BRIDGE_TASK_STACK_SIZE, NULL, 2, NULL);
 #endif

@@ -135,9 +135,11 @@ static void ssid_change() {
             };
             
             // Use the second entry from wifi_list for AP credentials
-            strcpy((char *)ap_config.ap.ssid, wifi_list[1].ssid);
-            strcpy((char *)ap_config.ap.password, wifi_list[1].password);
-            ap_config.ap.ssid_len = strlen(wifi_list[1].ssid);
+            strncpy((char *)ap_config.ap.ssid, wifi_list[1].ssid, sizeof(ap_config.ap.ssid) - 1);
+            ap_config.ap.ssid[sizeof(ap_config.ap.ssid) - 1] = '\0';
+            strncpy((char *)ap_config.ap.password, wifi_list[1].password, sizeof(ap_config.ap.password) - 1);
+            ap_config.ap.password[sizeof(ap_config.ap.password) - 1] = '\0';
+            ap_config.ap.ssid_len = strlen((char *)ap_config.ap.ssid);
             
             ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
             ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &ap_config));
@@ -161,8 +163,10 @@ static void ssid_change() {
         },
     };
 
-    strcpy((char *)wifi_config.sta.ssid, wifi_list[ssid_index].ssid);
-    strcpy((char *)wifi_config.sta.password, wifi_list[ssid_index].password);
+    strncpy((char *)wifi_config.sta.ssid, wifi_list[ssid_index].ssid, sizeof(wifi_config.sta.ssid) - 1);
+    wifi_config.sta.ssid[sizeof(wifi_config.sta.ssid) - 1] = '\0';
+    strncpy((char *)wifi_config.sta.password, wifi_list[ssid_index].password, sizeof(wifi_config.sta.password) - 1);
+    wifi_config.sta.password[sizeof(wifi_config.sta.password) - 1] = '\0';
     os_printf("Trying to connect to: %s (attempt %d/%d)\r\n", 
               wifi_list[ssid_index].ssid, retry_count + 1, MAX_RETRY_PER_NETWORK);
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));

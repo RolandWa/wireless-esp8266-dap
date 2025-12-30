@@ -60,16 +60,16 @@ static int attach(uint8_t *buffer, uint32_t length)
 
     switch (command)
     {
-    case USBIP_STAGE1_CMD_DEVICE_LIST: // OP_REQ_DEVLIST
+    case USBIP_STAGE1_REQ_DEVLIST: // OP_REQ_DEVLIST (0x8005)
         handle_device_list(buffer, length);
         break;
 
-    case USBIP_STAGE1_CMD_DEVICE_ATTACH: // OP_REQ_IMPORT
+    case USBIP_STAGE1_REQ_IMPORT: // OP_REQ_IMPORT (0x8003)
         handle_device_attach(buffer, length);
         break;
 
     default:
-        os_printf("attach Unknown command: %d\r\n", command);
+        os_printf("attach Unknown command: 0x%04x\r\n", command);
         break;
     }
     return 0;
@@ -82,13 +82,14 @@ static int read_stage1_command(uint8_t *buffer, uint32_t length)
         return -1;
     }
     usbip_stage1_header *req = (usbip_stage1_header *)buffer;
-    return (ntohs(req->command) & 0xFF); // 0x80xx low bit
+    // Return full 16-bit command code in host byte order
+    return ntohs(req->command);
 }
 
 static void handle_device_list(uint8_t *buffer, uint32_t length)
 {
     os_printf("Handling dev list request...\r\n");
-    send_stage1_header(USBIP_STAGE1_CMD_DEVICE_LIST, 0);
+    send_stage1_header(USBIP_STAGE1_REP_DEVLIST, 0);
     send_device_list();
 }
 
@@ -104,7 +105,7 @@ static void handle_device_attach(uint8_t *buffer, uint32_t length)
     }
     //client.readBytes((uint8_t *)bus, USBIP_BUSID_SIZE);
 
-    send_stage1_header(USBIP_STAGE1_CMD_DEVICE_ATTACH, 0);
+    send_stage1_header(USBIP_STAGE1_REP_IMPORT, 0);
 
     send_device_info();
 }
@@ -113,8 +114,9 @@ static void send_stage1_header(uint16_t command, uint32_t status)
 {
     os_printf("Sending header...\r\n");
     usbip_stage1_header header;
-    header.version = htons(273); ////TODO:  273???
-    // may be : https://github.com/Oxalin/usbip_windows/issues/4
+    // USB/IP Protocol Version: 273 = 0x0111 = v1.1.1 (Linux kernel standard)
+    header.version = htons(273);
+    // Reference: https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html
 
     header.command = htons(command);
     header.status = htonl(status);

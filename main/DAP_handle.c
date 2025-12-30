@@ -169,7 +169,7 @@ void DAP_Thread(void *argument)
     int resLength;
     DapPacket_t *item;
 
-    if (dap_dataIN_handle == NULL || dap_dataIN_handle == NULL ||
+    if (dap_dataIN_handle == NULL || dap_dataOUT_handle == NULL ||
         data_response_mux == NULL)
     {
         os_printf("Can not create DAP ringbuf/mux!\r\n");
@@ -186,7 +186,7 @@ void DAP_Thread(void *argument)
 
                 if (kRestartDAPHandle == RESET_HANDLE) {
                     malloc_dap_ringbuf();
-                    if (dap_dataIN_handle == NULL || dap_dataIN_handle == NULL)
+                    if (dap_dataIN_handle == NULL || dap_dataOUT_handle == NULL)
                     {
                         os_printf("Can not create DAP ringbuf/mux!\r\n");
                         vTaskDelete(NULL);

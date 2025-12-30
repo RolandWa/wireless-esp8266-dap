@@ -10,13 +10,18 @@
 #ifndef __WIFI_CONFIGURATION__
 #define __WIFI_CONFIGURATION__
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// SECURITY WARNING: Change the default credentials below before deploying!
+// The default passwords are WEAK and should NEVER be used in production.
+// Ensure SSIDs and passwords do not exceed 32 and 64 characters respectively.
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 static struct {
     const char *ssid;
     const char *password;
 } wifi_list[] __attribute__((unused)) = {
-    {.ssid = "OTA", .password = "12345678"},
-    {.ssid = "DAP", .password = "12345678"},
+    {.ssid = "OTA", .password = "12345678"},  // TODO: Change default password!
+    {.ssid = "DAP", .password = "12345678"},  // TODO: Change default password!
     // Add your WAP like this:
     // {.ssid = "your ssid", .password = "your password"},
 };
