@@ -1,0 +1,1 @@
+python -m esptool -p COM12 -b 460800 --chip esp32c3 write_flash 0x0 wireless_esp_dap_full.bin
