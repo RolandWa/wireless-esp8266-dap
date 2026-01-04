@@ -106,7 +106,7 @@
         "pth_inside_courtyard": "ignore",
         "shorting_items": "error",
         "silk_edge_clearance": "warning",
-        "silk_over_copper": "ignore",
+        "silk_over_copper": "warning",
         "silk_overlap": "ignore",
         "skew_out_of_range": "error",
         "solder_mask_bridge": "error",
@@ -782,6 +782,12 @@
           "label": "Exclude from Simulation",
           "name": "${EXCLUDE_FROM_SIM}",
           "show": false
+        },
+        {
+          "group_by": false,
+          "label": "TME",
+          "name": "TME",
+          "show": true
         }
       ],
       "filter_string": "",
@@ -789,7 +795,7 @@
       "include_excluded_from_bom": true,
       "name": "",
       "sort_asc": true,
-      "sort_field": "LCSC"
+      "sort_field": "Value"
     },
     "connection_grid_size": 50.0,
     "drawing": {
