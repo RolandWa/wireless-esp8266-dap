@@ -5,6 +5,10 @@ tmp/
 sdkconfig.old
 .cache/
 
+# Local Python environments / caches
+.venv/
+__pycache__/
+
 # Ignore large archive files
 *.zip
 *.rar
