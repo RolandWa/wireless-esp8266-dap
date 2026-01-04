@@ -365,6 +365,61 @@ P = (5V - 1.25V) × 1A = 3.75W (requires heatsinking!)
 - [ ] Verify thermal performance at high current
 - [ ] Check PWM frequency with scope (should be 1 kHz)
 
+## Debug Connector Integration
+
+### 10-Pin Cortex Debug Connectors (J1/J3)
+**NON-STANDARD Pinout:**
+```
+Pin 1: VTref        Pin 2: TMS/SWDIO
+Pin 3: GND          Pin 4: TCK/SWCLK
+Pin 5: UART_TX      Pin 6: TDO/SWO
+Pin 7: UART_RX      Pin 8: TDI
+Pin 9: VTarget      Pin 10: nRST
+```
+
+**Important Deviations:**
+- **Pin 5**: UART_TX (VCOM_TX) - typically GND in standard pinout
+- **Pin 7**: UART_RX (VCOM_RX) - typically KEY (not connected) in standard pinout
+- **Pin 9**: VTarget output - typically GND in standard pinout
+
+**VTarget Connection:**
+- Pin 9 provides programmable 1.25V-5.0V output from AP1117-ADJ circuit
+- Maximum current: 500mA recommended (1A absolute maximum with cooling)
+- Protects target device from over-voltage when set correctly
+- Can be monitored via Pin 1 (VTref sense)
+
+### 20-Pin ARM JTAG Connector (J2)
+**CUSTOM Pinout:**
+```
+Odd pins:  1:VTref  3:nTRST  5:TDI     7:TMS     9:TCK    11:UART_TX  13:TDO    15:nRST  17:UART_RX  19:VTarget
+Even pins: 2:VTref  4:GND    6:GND     8:GND    10:GND    12:GND      14:GND    16:GND   18:GND      20:VTref
+```
+
+**Important Deviations:**
+- **Pin 11**: UART_TX (VCOM_TX) - typically RTCK in standard ARM-20 pinout
+- **Pin 17**: UART_RX (VCOM_RX) - typically KEY (not connected) in standard pinout
+- **Pin 19**: VTarget output - typically nTRST in standard ARM-20 pinout
+- **Pin 20**: VTref sense - typically GND in standard ARM-20 pinout
+
+**UART Bridge Integration:**
+- UART signals on pins 5/7 (10-pin) and 11/17 (20-pin) connect to ESP32-C3:
+  - GPIO20 (D7): UART RX (receives data from target SWO/RTT)
+  - GPIO21 (D6): UART TX (sends data to target)
+- Enables SWO trace and RTT debugging without additional cables
+- Configure via `USE_UART_BRIDGE` in [main/wifi_configuration.h](main/wifi_configuration.h)
+
+### VTarget Power Supply Capability
+```
+Input:  5V from USB
+Output: 1.25V to 5.0V programmable
+Load:   Up to 500 mA typical, 1A max (with thermal management)
+```
+
+**Use Cases:**
+1. **Power target device** directly from debugger (no external supply needed)
+2. **Match target voltage** automatically for level shifting (prevents damage)
+3. **Test voltage sensitivity** by sweeping range during development
+
 ## Troubleshooting
 
 ### Voltage Won't Change
@@ -395,3 +450,9 @@ P = (5V - 1.25V) × 1A = 3.75W (requires heatsinking!)
 
 **Implementation Status**: ✅ Complete and ready for testing
 **Next Steps**: Build firmware, test on hardware, calibrate if needed
+
+## References
+- ESP-IDF LEDC (PWM) API reference: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/ledc.html
+- ESP-IDF ADC API reference: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/adc.html
+- Seeed Studio XIAO ESP32-C3 (module info/datasheet source): https://www.seeedstudio.com/
+- AP1117 / 1117-family regulator datasheets (example host): https://www.diodes.com/

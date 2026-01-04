@@ -1,12 +1,12 @@
 import re
 import csv
 import os
-from collections import defaultdict
 
-# Read the schematic file using relative paths
 script_dir = os.path.dirname(os.path.abspath(__file__))
-schematic_file = os.path.join(script_dir, "circuit_ESP32C3_Xiao", "ESP32C3_Xiao_wireless_DAP.kicad_sch")
-mapping_file = os.path.join(script_dir, "circuit_ESP32C3_Xiao", "jlcpcb", "mapping.csv")
+project_dir = os.path.abspath(os.path.join(script_dir, ".."))
+
+schematic_file = os.path.join(project_dir, "ESP32C3_Xiao_wireless_DAP.kicad_sch")
+mapping_file = os.path.join(project_dir, "jlcpcb", "mapping.csv")
 
 with open(schematic_file, 'r', encoding='utf-8') as f:
     content = f.read()
@@ -71,9 +71,9 @@ for comp in components:
     elif lcsc_map == 'Not in mapping':
         status = 'Not in Mapping'
     elif lcsc_sch == lcsc_map:
-        status = 'Match ✓'
+        status = 'Match'
     else:
-        status = 'MISMATCH ⚠'
+        status = 'MISMATCH'
     
     # Truncate footprint for display
     fp_display = footprint[:48] + '..' if len(footprint) > 50 else footprint

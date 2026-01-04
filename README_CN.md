@@ -472,3 +472,9 @@ CONFIG_USE_WEBSOCKET_DAP=y
 
 ## 许可证
 [MIT 许可证](LICENSE)
+
+## References
+- 项目上游仓库 (windowsair/wireless-esp8266-dap): https://github.com/windowsair/wireless-esp8266-dap
+- CMSIS (ARM): https://github.com/ARM-software/CMSIS_5
+- ESP-IDF 文档: https://docs.espressif.com/projects/esp-idf/en/latest/
+- usbip-win (Windows USBIP 客户端): https://github.com/cezanne/usbip-win

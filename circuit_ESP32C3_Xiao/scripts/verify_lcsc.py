@@ -1,9 +1,9 @@
-import re
 import os
+import re
 
-# Use relative path from script location
 script_dir = os.path.dirname(os.path.abspath(__file__))
-schematic_file = os.path.join(script_dir, "circuit_ESP32C3_Xiao", "ESP32C3_Xiao_wireless_DAP.kicad_sch")
+project_dir = os.path.abspath(os.path.join(script_dir, ".."))
+schematic_file = os.path.join(project_dir, "ESP32C3_Xiao_wireless_DAP.kicad_sch")
 
 with open(schematic_file, 'r', encoding='utf-8') as f:
     content = f.read()
@@ -101,10 +101,10 @@ for c in components:
 errors_found = False
 for lcsc, values in lcsc_to_values.items():
     if len(values) > 1:
-        print(f"❌ ERROR: LCSC {lcsc} assigned to multiple different values: {', '.join(values)}")
+        print(f"ERROR: LCSC {lcsc} assigned to multiple different values: {', '.join(values)}")
         errors_found = True
 
 if not errors_found:
-    print("✅ No LCSC assignment errors found - each LCSC part number maps to only one component value")
+    print("OK: No LCSC assignment errors found - each LCSC part number maps to only one component value")
 
 print('=' * 140)

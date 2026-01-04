@@ -677,3 +677,8 @@ To add new tests:
 ## License
 
 Same as parent project (MIT)
+
+## References
+- Zadig (Windows USB driver tool): https://zadig.akeo.ie/
+- pyOCD: https://pyocd.io/
+- PyVISA: https://pyvisa.readthedocs.io/

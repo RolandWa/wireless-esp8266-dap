@@ -10,6 +10,12 @@
 
 [中文](README_CN.md)
 
+## Project Link (QR)
+
+Scan to open the project repository:
+
+![Project repository QR code](circuit_ESP32C3_Xiao/documentations/assets/github_repo_qr.png)
+
 ## Introduce
 
 Wireless debugging with ***only one ESP Chip*** !
@@ -601,4 +607,10 @@ Credits to the following project, people and organizations:
 ## License
 
 [MIT LICENSE](LICENSE)
+
+## References
+- Project upstream (windowsair/wireless-esp8266-dap): https://github.com/windowsair/wireless-esp8266-dap
+- CMSIS (ARM): https://github.com/ARM-software/CMSIS_5
+- ESP-IDF documentation: https://docs.espressif.com/projects/esp-idf/en/latest/
+- usbip-win (Windows USBIP client): https://github.com/cezanne/usbip-win
 
