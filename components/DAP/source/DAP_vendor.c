@@ -118,8 +118,20 @@ static uint16_t vtarget_read_mv(void) {
     uint16_t avg_voltage = (uint16_t)(voltage_sum / valid_samples);
     uint16_t result = avg_voltage * 2;
     
-    ESP_LOGD(TAG, "VTarget read: %d mV (raw avg: %d mV, samples: %d)", result, avg_voltage, valid_samples);
+    ESP_LOGI(TAG, "VTref read: %d mV (raw avg: %d mV, samples: %d)", result, avg_voltage, valid_samples);
     return result;
+}
+
+void vtarget_log_boot_reading(void) {
+    uint16_t mv = vtarget_read_mv();
+    if (mv == 0xFFFF)
+        ESP_LOGW(TAG, "VTref boot read: ADC error");
+    else
+        ESP_LOGI(TAG, "VTref boot read: %d mV (%.3f V)", mv, mv / 1000.0f);
+}
+
+uint16_t vtarget_read_mv_public(void) {
+    return vtarget_read_mv();
 }
 
 #else

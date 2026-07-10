@@ -5,6 +5,9 @@ tmp/
 sdkconfig.old
 .cache/
 
+# WiFi credentials — never commit this file
+main/wifi_configuration.h
+
 # Local Python environments / caches
 .venv/
 __pycache__/

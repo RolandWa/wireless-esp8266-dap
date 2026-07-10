@@ -4,6 +4,7 @@ This checklist is meant to be run repeatedly during layout (online DRC) and agai
 
 ## 0. Workflow (when to run checks)
 - [ ] **Define rules early:** Set manufacturer-driven constraints before routing (clearances, min track/via/drill, mask/silk limits, board edge clearances).
+- [ ] **Define net classes + rule severity:** Set up net classes / constraint sets (track/via/diff-pair geometry) and choose error vs warning vs ignore intentionally.
 - [ ] **Keep DRC “online”:** Fix violations immediately while placing/routing.
 - [ ] **Before final DRC:** Refill zones (or enable “refill zones before DRC”) so results match final copper.
 - [ ] **Final DRC run:** Run a full DRC and export/save the report.
@@ -14,6 +15,7 @@ This checklist is meant to be run repeatedly during layout (online DRC) and agai
 - [ ] **Copper clearances:** Trace-to-trace, trace-to-pad, pad-to-pad meet the chosen capability class.
 - [ ] **Track widths vs. current:** Power rails sized for current and copper weight; internal layers (if any) usually need wider tracks for the same current.
 - [ ] **Via/drill sizes:** Drill diameter and finished hole sizes meet fab limits; avoid “exotic” sizes unless required.
+- [ ] **Via covering strategy:** Decide/document whether vias are tented, plugged, or open (and where via-in-pad is allowed) per fab capability.
 - [ ] **Annular ring:** Ensure adequate ring around plated holes/vias to prevent drill breakout.
 - [ ] **Hole-to-copper / hole-to-hole:** Maintain clearance around drills and between adjacent drills.
 - [ ] **Solder mask sliver / dam:** Ensure mask between adjacent pads is manufacturable; avoid tiny slivers that will wash out.
@@ -38,7 +40,8 @@ This checklist is meant to be run repeatedly during layout (online DRC) and agai
 ## 4. Signal integrity / EMI / power integrity (performance-focused checks)
 - [ ] **Solid reference plane:** High-speed/fast-edge signals route over a continuous reference plane; avoid crossing plane splits.
 - [ ] **Return path continuity:** Confirm return currents are not forced into large loops by breaks, voids, or stitching gaps.
-- [ ] **Crosstalk control:** For long parallel runs, increase spacing (rule of thumb: keep-to-keep separation multiple of trace width when feasible).
+- [ ] **Avoid right angles:** Prefer 45° corners (especially for fast-edge nets); avoid 90° corners where practical.
+- [ ] **Crosstalk control:** For long parallel runs, increase spacing (rule of thumb: “3W” spacing, i.e., separation >= 3x trace width when feasible).
 - [ ] **Differential pairs:** Consistent spacing/coupling, symmetric routing, length matching/skew within requirement, avoid vias or use them symmetrically.
 - [ ] **Vias used intentionally:** Minimize unnecessary layer changes (vias add inductance and manufacturing complexity).
 - [ ] **Decoupling placement:** Bypass capacitors placed close to IC power pins with short, low-inductance connections to power and ground.
@@ -84,6 +87,7 @@ Even for SELV products, capture layout evidence that reduces safety risk.
 ## References
 - https://www.eevblog.com/forum/beginners/pcb-design-rules/?all
 - https://www.protoexpress.com/blog/drc-pcb-manufacturing/
+- https://www.protoexpress.com/kb/pcb-via-tenting-design-rules-and-fabrication-notes/
 - https://www.bernini-design.ro/best-rules-for-a-good-electronic-board-design/
 - https://resources.altium.com/p/master-your-pcb-design-workflow-with-online-design-rule-checking
 - https://jlcpcb.com/blog/pcb-design-rules-best-practices
