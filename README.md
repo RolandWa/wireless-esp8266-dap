@@ -298,28 +298,48 @@ Additional hardware reference designs are available from contributors in the [ci
 
 ## Build And Flash
 
-You can build locally or use Github Action to build online and then download firmware to flash.
+You can build locally (WSL) or use GitHub Actions to build online and download the firmware.
 
-### Build with Github Action Online
+### Build with GitHub Actions (Online)
 
-See: [Build with Github Action](https://github.com/windowsair/wireless-esp8266-dap/wiki/Build-with-Github-Action)
+Push to the branch — CI runs automatically and uploads firmware as build artifacts.
+See [.github/workflows/main.yml](.github/workflows/main.yml).
 
+### Build Locally — WSL / Windows (Recommended)
 
-### General build and Flash
+> Full details, troubleshooting, and environment notes: **[docs/build_wsl.md](docs/build_wsl.md)**
+
+**Requirements:** WSL2 Ubuntu, Python 3.10 (installed automatically), ESP-IDF **v4.4.2**.
+
+```bash
+# Run inside the Ubuntu WSL terminal — first-time setup + build:
+python3 build_WSL.py
+
+# Subsequent builds (setup already done):
+python3 build_WSL.py --build
+
+# Clean rebuild:
+python3 build_WSL.py --build --clean
+```
+
+The script installs all dependencies, clones ESP-IDF v4.4.2, builds the firmware, and
+merges everything into `~/build_wireless_dap/wireless_esp_dap_full.bin`.
+
+**Flash to device (Windows, COM12):**
+
+```bat
+flash_eps.bat
+```
+
+> **Always use ESP-IDF v4.4.2 exactly.** This codebase targets v4.4 APIs.
+> Building with IDF v5+ requires significant source changes and is not supported.
+
+### Build for ESP8266
 
 <details>
 <summary>ESP8266</summary>
 
-1. Get ESP8266 RTOS Software Development Kit
-
-    The SDK is already included in the project. Please don't use other versions of the SDK.
-
-2. Build & Flash
-
-    Build with ESP-IDF build system.
-    More information can be found at the following link: [Build System](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html "Build System")
-
-The following example shows a possible way to build on Windows:
+The SDK is already included. Do not use other SDK versions.
 
 ```bash
 # Build
@@ -330,65 +350,7 @@ python ./idf.py -p /dev/ttyS5 flash
 
 </details>
 
-
-<details>
-<summary>ESP32/ESP32C3/ESP32S3</summary>
-
-1. Get ESP-IDF
-
-    For now, please use ESP-IDF v4.4.2 or later: https://github.com/espressif/esp-idf/releases/tag/v4.4.2
-    
-    Installation guides:
-    - Linux/macOS: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/linux-macos-setup.html
-    - Windows: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/windows-setup.html
-
-2. Build & Flash
-
-    Build with ESP-IDF build system.
-    More information can be found at the following link: [Build System](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html "Build System")
-
-**Linux/macOS:**
-
-```bash
-# Set build target (choose one)
-idf.py set-target esp32      # For ESP32
-idf.py set-target esp32c3    # For ESP32-C3
-idf.py set-target esp32s3    # For ESP32-S3
-
-# Build
-idf.py build
-
-# Flash (replace with your port, e.g., /dev/ttyUSB0, /dev/ttyACM0)
-idf.py -p /dev/ttyUSB0 flash
-
-# Optional: Monitor serial output
-idf.py -p /dev/ttyUSB0 monitor
-```
-
-**Windows:**
-
-```bash
-# Set build target (choose one)
-idf.py set-target esp32      # For ESP32
-idf.py set-target esp32c3    # For ESP32-C3
-idf.py set-target esp32s3    # For ESP32-S3
-
-# Build
-idf.py build
-
-# Flash (replace COM5 with your port)
-idf.py -p COM5 flash
-
-# Optional: Monitor serial output
-idf.py -p COM5 monitor
-```
-
-> **Note:** The `idf.py` in the project root directory is only applicable to the old ESP8266 target. For ESP32/ESP32-C3/ESP32-S3, use the `idf.py` from your ESP-IDF installation (should be in your PATH after running `export.sh` on Linux/macOS or using the ESP-IDF command prompt on Windows).
-
-</details>
-
-
-> We also provided sample firmware for quick evaluation. See [Releases](https://github.com/windowsair/wireless-esp8266-dap/releases)
+> Pre-built firmware for quick evaluation: [Releases](https://github.com/windowsair/wireless-esp8266-dap/releases)
 
 
 ## Usage
