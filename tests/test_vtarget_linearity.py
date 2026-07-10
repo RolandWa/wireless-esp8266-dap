@@ -67,9 +67,12 @@ class VTargetLinearityTest:
     MEASUREMENT_SAMPLES = 10  # number of measurements per voltage point
     MEASUREMENT_DELAY = 0.05  # seconds between measurements
     
-    # Vendor commands
-    CMD_READ_VTARGET = 0x81  # Read VTarget voltage
-    CMD_SET_VTARGET = 0x82   # Set VTarget voltage
+    # pyOCD vendor() API: vendor(index, data)
+    # index = offset from DAP_VENDOR0 (0x80), NOT the full command ID.
+    # ID_DAP_Vendor1 (0x81) → index=1, ID_DAP_Vendor2 (0x82) → index=2.
+    # pyOCD strips the echoed command byte; response[0] is the first payload byte.
+    CMD_READ_VTARGET = 1  # DAP Vendor index for read  (command ID 0x81)
+    CMD_SET_VTARGET  = 2  # DAP Vendor index for set   (command ID 0x82)
     
     def __init__(self, serial_number: str = None, dmm_resource: str = None):
         """Initialize test suite
@@ -214,23 +217,22 @@ class VTargetLinearityTest:
     
     def read_vtarget(self) -> int:
         """Read VTarget voltage from DAP
-        
+
         Returns:
             Voltage in millivolts, or -1 on error
         """
         try:
-            # Send vendor command to read VTarget
-            cmd = bytearray([self.CMD_READ_VTARGET])
-            response = self.session.probe.vendor(cmd)
-            
-            if len(response) >= 3:
-                # Response format: [CMD_ID, VOLTAGE_LOW, VOLTAGE_HIGH]
-                voltage_mv = response[1] | (response[2] << 8)
+            # probe.vendor(int, list) strips the echoed command ID;
+            # response[0]=LOW, response[1]=HIGH
+            response = self.session.probe.vendor(self.CMD_READ_VTARGET, [])
+
+            if len(response) >= 2:
+                voltage_mv = response[0] | (response[1] << 8)
                 return voltage_mv
             else:
                 print(f"Invalid response length: {len(response)}")
                 return -1
-                
+
         except Exception as e:
             print(f"Error reading VTarget: {e}")
             return -1
@@ -249,16 +251,14 @@ class VTargetLinearityTest:
             return False
         
         try:
-            # Send vendor command to set VTarget
-            cmd = bytearray([
-                self.CMD_SET_VTARGET,
-                voltage_mv & 0xFF,
-                (voltage_mv >> 8) & 0xFF
-            ])
-            response = self.session.probe.vendor(cmd)
-            
-            if len(response) >= 2:
-                status = response[1]
+            # probe.vendor(int, list) strips the echoed command ID;
+            # response[0] is the status byte
+            low_byte = voltage_mv & 0xFF
+            high_byte = (voltage_mv >> 8) & 0xFF
+            response = self.session.probe.vendor(self.CMD_SET_VTARGET, [low_byte, high_byte])
+
+            if len(response) >= 1:
+                status = response[0]
                 if status == 0x00:
                     return True
                 elif status == 0x01:
@@ -370,47 +370,6 @@ class VTargetLinearityTest:
         else:
             print(f"  DAP Mean: {mean_dap_voltage:.2f} mV, StdDev: {stdev_dap_voltage:.2f} mV")
             print(f"  DAP Error vs Setpoint: {error_dap_mv:.2f} mV ({error_dap_percent:.2f}%)")
-        
-        return result
-            return None
-        
-        # Wait for settling
-        time.sleep(self.SETTLING_TIME)
-        
-        # Take multiple measurements
-        measurements = []
-        for i in range(self.MEASUREMENT_SAMPLES):
-            voltage = self.read_vtarget()
-            if voltage >= 0:
-                measurements.append(voltage)
-            time.sleep(self.MEASUREMENT_DELAY)
-        
-        if not measurements:
-            print(f"  Error: No valid measurements")
-            return None
-        
-        # Calculate statistics
-        mean_voltage = statistics.mean(measurements)
-        stdev_voltage = statistics.stdev(measurements) if len(measurements) > 1 else 0
-        min_voltage = min(measurements)
-        max_voltage = max(measurements)
-        error_mv = mean_voltage - set_voltage_mv
-        error_percent = (error_mv / set_voltage_mv) * 100
-        
-        result = {
-            'set_voltage_mv': set_voltage_mv,
-            'mean_voltage_mv': mean_voltage,
-            'stdev_voltage_mv': stdev_voltage,
-            'min_voltage_mv': min_voltage,
-            'max_voltage_mv': max_voltage,
-            'samples': len(measurements),
-            'error_mv': error_mv,
-            'error_percent': error_percent,
-            'raw_measurements': measurements
-        }
-        
-        print(f"  Mean: {mean_voltage:.2f} mV, StdDev: {stdev_voltage:.2f} mV")
-        print(f"  Error: {error_mv:.2f} mV ({error_percent:.2f}%)")
         
         return result
     

@@ -216,7 +216,7 @@ void app_main() {
     DAP_Setup();
     timer_init();
 
-#if defined(CONFIG_IDF_TARGET_ESP32C3)
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
     // Initialize VTarget PWM control (GPIO3)
     ESP_ERROR_CHECK(vtarget_pwm_init());
     // Set default VTarget to 3.3V

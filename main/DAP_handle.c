@@ -111,8 +111,10 @@ void handle_dap_data_request(usbip_stage2_header *header, uint32_t length)
     // Point to the beginning of the URB packet
 
 #if (USE_WINUSB == 1)
-    send_stage2_submit_data_fast(header, NULL, 0);
+    send_stage2_submit_data_fast(header, NULL, 0);  // ACK OUT URB immediately
 
+    os_printf("[DAP] enqueue cmd=0x%02x [%02x %02x %02x %02x]\r\n",
+              data_in[0], data_in[0], data_in[1], data_in[2], data_in[3]);
     // always send constant size buf -> cuz we don't care about the IN packet size
     // and to unify the style, we set aside the length of the section
     xRingbufferSend(dap_dataIN_handle, data_in - sizeof(uint32_t), DAP_HANDLE_SIZE, portMAX_DELAY);
@@ -228,6 +230,12 @@ void DAP_Thread(void *argument)
             resLength = DAP_ProcessCommand((uint8_t *)item->buf, (uint8_t *)DAPDataProcessed.buf); // use first 4 byte to save length
             resLength &= 0xFFFF;                                                                   // res length in lower 16 bits
 
+            os_printf("[DAP] processed cmd=0x%02x resp_len=%d resp=[%02x %02x %02x]\r\n",
+                      item->buf[0], resLength,
+                      DAPDataProcessed.buf[0],
+                      resLength > 1 ? DAPDataProcessed.buf[1] : 0,
+                      resLength > 2 ? DAPDataProcessed.buf[2] : 0);
+
             vRingbufferReturnItem(dap_dataIN_handle, (void *)item); // process done.
 
             // now prepare to reply
@@ -256,6 +264,10 @@ int fast_reply(uint8_t *buf, uint32_t length, int dap_req_num)
                                                      portMAX_DELAY, DAP_HANDLE_SIZE);
         if (packetSize == DAP_HANDLE_SIZE) {
 #if (USE_WINUSB == 1)
+            os_printf("fast_reply: cmd=0x%02x len=%d data=[%02x %02x %02x]\r\n",
+                      item->buf[0], item->length,
+                      item->buf[0], item->length > 1 ? item->buf[1] : 0,
+                      item->length > 2 ? item->buf[2] : 0);
             send_stage2_submit_data_fast((usbip_stage2_header *)buf, item->buf, item->length);
 #else
             send_stage2_submit_data_fast((usbip_stage2_header *)buf, item->buf, DAP_HANDLE_SIZE);

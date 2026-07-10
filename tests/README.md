@@ -678,6 +678,49 @@ To add new tests:
 
 Same as parent project (MIT)
 
+## pyOCD Vendor Command Protocol
+
+The VTarget commands use CMSIS-DAP Vendor Commands via `probe.vendor(index, data)`.
+
+> **Critical:** `index` is an **offset** (0–31) from `DAP_VENDOR0` (`0x80`), not the raw command ID.
+> pyOCD computes `cmd_id = 0x80 + index` internally and **strips the echoed command byte** from the response.
+
+|Command|index|cmd_id|Request data|Response|
+|-------|-----|------|------------|--------|
+|Read VTarget|`1`|`0x81`|`[]`|`[LOW, HIGH]` — mV little-endian. `0xFFFF` = ADC error|
+|Set VTarget|`2`|`0x82`|`[LOW, HIGH]` — mV little-endian (1250–5000)|`[0x00]` ok · `[0x01]` range err · `[0xFF]` error|
+
+**Minimal example:**
+
+```python
+# Read
+response = probe.vendor(1, [])
+voltage_mv = response[0] | (response[1] << 8)
+
+# Set 3.3V
+mv = 3300
+probe.vendor(2, [mv & 0xFF, (mv >> 8) & 0xFF])
+```
+
+**Common mistake:** passing the full command ID (`0x81`) as the index causes pyOCD to send `0x80 + 0x81 = 0x101`, which the firmware never handles.
+
+## Measured VTref Accuracy
+
+Results from hardware validation (ESP32-C3 XIAO, eFuse Vref calibration, 20-sample average, 1/2 voltage divider on GPIO2):
+
+|Supply (mV)|Measured (mV)|Error (mV)|Error (%)|
+|-----------|-------------|----------|---------|
+|606|614|+8|+1.3%|
+|846|858|+12|+1.4%|
+|1649|1662|+13|+0.8%|
+|2604|2628|+24|+0.9%|
+|2984|2994|+10|+0.3%|
+|3460|3490|+30|+0.9%|
+|3975|3997|+22|+0.6%|
+|5054|5067|+13|+0.3%|
+
+Max error: **+30 mV** at 3.46 V. Consistent positive bias (~10–30 mV) across 0.6–5.0 V range. All readings within ±1.5% of true value.
+
 ## References
 - Zadig (Windows USB driver tool): https://zadig.akeo.ie/
 - pyOCD: https://pyocd.io/

@@ -198,12 +198,48 @@ There is built-in ipv4 only mDNS server. You can access the device using `dap.lo
 
 
 > Rx and Tx is used for uart bridge, not enabled by default.
-> 
-> VTarget is sensed via a 1/2 voltage divider on GPIO2 (ADC0). Use DAP Vendor Command 0x81 to read target voltage.
-> 
-> VTarget voltage can be controlled via PWM on GPIO3 (1.25V-5.0V range). Use DAP Vendor Command 0x82 to set target voltage.
-> 
+>
 > **Note for XIAO-ESP32-C3:** UART pins are GPIO21 (D6/TX) and GPIO20 (D7/RX).
+
+#### VTarget Vendor Commands (ESP32-C3 / ESP32-S3 only)
+
+VTarget sensing and control use CMSIS-DAP Vendor Commands via the pyOCD API.
+
+> **pyOCD API note:** `probe.vendor(index, data)` takes an **index** (0–31), not the raw command ID.
+> pyOCD computes `cmd_id = 0x80 + index` internally and strips the echoed byte from the response.
+
+|Function|pyOCD call|Command ID|Request|Response|
+|--------|----------|----------|-------|--------|
+|Read VTarget|`probe.vendor(1, [])`|`0x81`|—|`[LOW, HIGH]` voltage in mV, little-endian. `0xFFFF` = error|
+|Set VTarget|`probe.vendor(2, [LOW, HIGH])`|`0x82`|voltage in mV (1250–5000), little-endian|`[0x00]` success · `[0x01]` out of range · `[0xFF]` error|
+
+**Python example:**
+
+```python
+# Read VTarget voltage (mV)
+response = probe.vendor(1, [])          # index=1 → command 0x81
+voltage_mv = response[0] | (response[1] << 8)
+print(f"VTarget: {voltage_mv} mV ({voltage_mv/1000:.3f} V)")
+
+# Set VTarget to 3.3V
+mv = 3300
+probe.vendor(2, [mv & 0xFF, (mv >> 8) & 0xFF])  # index=2 → command 0x82
+```
+
+**Measured accuracy (ESP32-C3 XIAO, eFuse Vref calibration, 20-sample average):**
+
+|Supply (mV)|Measured (mV)|Error (mV)|Error (%)|
+|-----------|-------------|----------|---------|
+|606|614|+8|+1.3%|
+|846|858|+12|+1.4%|
+|1649|1662|+13|+0.8%|
+|2604|2628|+24|+0.9%|
+|2984|2994|+10|+0.3%|
+|3460|3490|+30|+0.9%|
+|3975|3997|+22|+0.6%|
+|5054|5067|+13|+0.3%|
+
+Max error: **+30 mV** at 3.46 V. Consistent positive offset bias (~10–30 mV) typical of ESP32-C3 ADC with 11 dB attenuation. All readings within ±1.5%.
 
 
 </details>

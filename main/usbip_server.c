@@ -88,14 +88,14 @@ static int read_stage1_command(uint8_t *buffer, uint32_t length)
 
 static void handle_device_list(uint8_t *buffer, uint32_t length)
 {
-    os_printf("Handling dev list request...\r\n");
+    os_printf("[USBIP] OP_REQ_DEVLIST -> sending device list\r\n");
     send_stage1_header(USBIP_STAGE1_REP_DEVLIST, 0);
     send_device_list();
 }
 
 static void handle_device_attach(uint8_t *buffer, uint32_t length)
 {
-    os_printf("Handling dev attach request...\r\n");
+    os_printf("[USBIP] OP_REQ_IMPORT -> attaching device\r\n");
 
     //char bus[USBIP_BUSID_SIZE];
     if (length < sizeof(USBIP_BUSID_SIZE))
@@ -224,13 +224,25 @@ static int usbip_urb_process(uint8_t *base, uint32_t length)
 
         if (likely(command == USBIP_STAGE2_REQ_SUBMIT)) {
             if (likely(ep == 1 && dir == USBIP_DIR_IN)) {
+                os_printf("[URB] EP1 IN  seq=%u pending=%d\r\n",
+                          ntohl(header->base.seqnum), dap_req_num);
                 fast_reply(base, sizeof(usbip_stage2_header), dap_req_num);
                 if (dap_req_num > 0)
                     dap_req_num--;
             } else if (likely(ep == 1 && dir == USBIP_DIR_OUT)) {
+                uint8_t *payload = base + sizeof(usbip_stage2_header);
+                uint32_t dlen = ntohl(header->u.cmd_submit.data_length);
+                os_printf("[URB] EP1 OUT seq=%u len=%u cmd=0x%02x\r\n",
+                          ntohl(header->base.seqnum), dlen,
+                          dlen > 0 ? payload[0] : 0xFF);
                 dap_req_num++;
                 handle_dap_data_request(header, length);
             } else if (ep == 0) {
+                os_printf("[URB] EP0 ctrl seq=%u bReq=0x%02x wVal=0x%04x\r\n",
+                          ntohl(header->base.seqnum),
+                          header->u.cmd_submit.request.bRequest,
+                          (header->u.cmd_submit.request.wValue.u8hi << 8) |
+                           header->u.cmd_submit.request.wValue.u8lo);
                 unpack(base, sizeof(usbip_stage2_header));
                 handleUSBControlRequest(header);
             } else {

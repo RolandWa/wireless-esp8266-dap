@@ -93,20 +93,27 @@ class XiaoUSBTest:
             self.log_test("DAP Info", False, f"Error: {str(e)}")
             return False
     
+    # pyOCD vendor() API: vendor(index, data)
+    # index = offset from DAP_VENDOR0 (0x80), NOT the full command ID.
+    # ID_DAP_Vendor1 (0x81) → index=1, ID_DAP_Vendor2 (0x82) → index=2.
+    # pyOCD strips the echoed command byte; response[0] is the first payload byte.
+    DAP_VENDOR_READ_VTARGET = 1   # maps to command ID 0x81
+    DAP_VENDOR_SET_VTARGET  = 2   # maps to command ID 0x82
+
     def test_vtarget_read(self) -> Optional[float]:
-        """Test VTarget voltage reading (Command 0x81)"""
+        """Test VTarget voltage reading (DAP Vendor index 1 = command 0x81)"""
         print("\n=== VTarget Reading Test ===")
-        
+
         if not self.probe:
             self.log_test("VTarget Read", False, "No probe connected")
             return None
-        
+
         try:
-            # Send vendor command 0x81 (Read VTarget)
-            response = self.probe.vendor(0x81, [])
-            
+            # vendor(index, data): index=1 → sends 0x80+1=0x81; response has echo stripped
+            response = self.probe.vendor(self.DAP_VENDOR_READ_VTARGET, [])
+
             if len(response) >= 2:
-                # Parse voltage (little-endian, mV)
+                # Parse voltage (little-endian, mV); response[0]=LOW, response[1]=HIGH
                 voltage_mv = response[0] | (response[1] << 8)
                 voltage_v = voltage_mv / 1000.0
                 
@@ -130,25 +137,24 @@ class XiaoUSBTest:
             return None
     
     def test_vtarget_set(self, voltage_mv: int) -> bool:
-        """Test VTarget voltage setting (Command 0x82)"""
+        """Test VTarget voltage setting (DAP Vendor index 2 = command 0x82)"""
         print(f"\n=== VTarget Set Test ({voltage_mv} mV) ===")
-        
+
         if not self.probe:
             self.log_test("VTarget Set", False, "No probe connected")
             return False
-        
+
         try:
             # Validate range
             if not (1250 <= voltage_mv <= 5000):
                 self.log_test("VTarget Set", False, f"Invalid range: {voltage_mv} mV (must be 1250-5000)")
                 return False
-            
-            # Send vendor command 0x82 (Set VTarget)
+
+            # vendor(index, data): index=2 → sends 0x80+2=0x82; response has echo stripped
             low_byte = voltage_mv & 0xFF
             high_byte = (voltage_mv >> 8) & 0xFF
-            
-            response = self.probe.vendor(0x82, [low_byte, high_byte])
-            
+            response = self.probe.vendor(self.DAP_VENDOR_SET_VTARGET, [low_byte, high_byte])
+
             if len(response) >= 1:
                 status = response[0]
                 

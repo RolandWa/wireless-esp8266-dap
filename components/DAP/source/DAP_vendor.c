@@ -62,7 +62,7 @@ static void vtarget_adc_init(void) {
     // Configure ADC1 width (12-bit resolution)
     adc1_config_width(ADC_WIDTH_BIT_12);
 
-    // Configure ADC1 Channel 2 (GPIO2) with 11dB attenuation (0-3.3V range)
+    // Configure ADC1 Channel 2 (GPIO2) with 11dB attenuation (0~3.1V range)
     adc1_config_channel_atten(ADC1_CHANNEL_2, ADC_ATTEN_DB_11);
 
     // Characterize ADC for calibration
@@ -94,7 +94,7 @@ static uint16_t vtarget_read_mv(void) {
     uint32_t voltage_sum = 0;
     uint8_t valid_samples = 0;
 
-    // Read ADC 20 times and average
+    // Read ADC 20 times and average; small delay between samples for independence
     for (int i = 0; i < 20; i++) {
         int adc_raw = adc1_get_raw(ADC1_CHANNEL_2);
 
@@ -107,6 +107,7 @@ static uint16_t vtarget_read_mv(void) {
 
         voltage_sum += voltage_mv;
         valid_samples++;
+        esp_rom_delay_us(500);  // 0.5 ms between samples to reduce correlation
     }
 
     if (valid_samples == 0) {
@@ -115,8 +116,8 @@ static uint16_t vtarget_read_mv(void) {
     }
 
     // Calculate average and compensate for 1/2 voltage divider (multiply by 2)
-    uint16_t avg_voltage = (uint16_t)(voltage_sum / valid_samples);
-    uint16_t result = avg_voltage * 2;
+    uint32_t avg_voltage = voltage_sum / valid_samples;
+    uint16_t result = (uint16_t)(avg_voltage * 2);
 
     ESP_LOGI(TAG, "VTarget read: %d mV (raw avg: %d mV, samples: %d)", result, avg_voltage, valid_samples);
     return result;
