@@ -465,14 +465,55 @@ When you select max clock, we will take the following actions:
 
 ### For OpenOCD user
 
-This project was originally designed to run on Keil, but now you can also perform firmware flash on OpenOCD.
+Connect directly over WiFi — **no USB cable, no USBIP kernel driver required**.
 
-```bash
-> halt
-> flash write_image [erase] [unlock] filename [offset] [type]
+The recommended path is the elaphureLink OpenOCD (already installed at `c:\openocd\elaphurelink\`):
+
+```bat
+c:\openocd\elaphurelink\bin\openocd.exe ^
+  -s c:\openocd\elaphurelink\share\openocd\scripts ^
+  -f openocd/elaphurelink.cfg ^
+  -f target/stm32f4x.cfg
 ```
 
-> pyOCD is now supported.
+Flash a `.bin` file to a target (example: Maxim MAX32672):
+
+```bat
+openocd\flash_max32672.bat firmware.bin
+```
+
+Or use OpenOCD commands directly:
+
+```tcl
+halt
+flash write_image erase firmware.bin 0x10000000
+verify_image firmware.bin 0x10000000
+reset run
+```
+
+See **[docs/openocd.md](docs/openocd.md)** for all three connection paths (elaphureLink OpenOCD, Python bridge, pyOCD API) with full command examples.
+
+### For pyOCD user
+
+pyOCD 0.44+ can connect directly over WiFi via the elaphureLink TCP interface — **no USB driver or USBIP needed**:
+
+```python
+from tests.pyocd_elaphurelink import make_probe
+from pyocd.core.session import Session
+
+probe = make_probe("192.168.137.123")   # or "dap.local"
+with Session(probe, target_override="your_target") as session:
+    session.open()
+    t = session.target
+    t.halt()
+    print(hex(t.read_core_register("pc")))
+```
+
+Standalone probe test (checks connection without a target MCU attached):
+
+```bat
+python tests/pyocd_elaphurelink.py --ip 192.168.137.123
+```
 
 ### System OTA
 
@@ -520,20 +561,64 @@ esptool.py -p (PORT) flash_id
 
 ### Uart TCP Bridge
 
-This feature provides a bridge between TCP and Uart:
-```
-Send data   ->  TCP  ->  Uart TX -> external devices
+Bridges **TCP port 1234 ↔ UART1** (GPIO21 TX / GPIO20 RX on ESP32-C3 XIAO).
+Lets any PC application talk to a serial device wired to those pins — over WiFi,
+no USB-serial adapter needed.
 
-Recv data   <-  TCP  <-  Uart Rx <- external devices
+```text
+PC TCP client (port 1234)
+  ↕  WiFi
+ESP32-C3
+  ↕  GPIO21 TX / GPIO20 RX
+Target MCU serial / AT modem / SWO trace
 ```
 
 ![uart_tcp_bridge](https://user-images.githubusercontent.com/17078589/150290065-05173965-8849-4452-ab7e-ec7649f46620.jpg)
 
-When the TCP connection is established, bridge will try to resolve the text sent for the first packet. When the text is a valid baud rate, bridge will switch to it.
-For example, sending the ASCII text `115200` will switch the baud rate to 115200.
+**Supported baud rates:** 9600 · 14400 · 19200 · 28800 · 38400 · 56000 · 57600 · 115200
 
+**Enable** in [main/wifi_configuration.h](main/wifi_configuration.h):
 
-For performance reasons, this feature is not enabled by default. You can modify [wifi_configuration.h](main/wifi_configuration.h) to turn it on.
+```c
+#define USE_UART_BRIDGE      1
+#define UART_BRIDGE_PORT     1234
+#define UART_BRIDGE_BAUDRATE 115200
+```
+
+**Connect** from Windows — pick any:
+
+- **Python terminal:** `python tests/uart_bridge.py --baud 115200`
+- **PuTTY:** see step-by-step below
+- **Netcat:** `ncat dap.local 1234`
+
+**Baud-rate negotiation:** the very first TCP packet, if it is a plain decimal number
+(e.g. `"115200"`), reconfigures the UART to that rate before forwarding begins.
+Each new baud rate requires a new TCP connection.
+
+#### PuTTY — step by step
+
+1. Open **PuTTY**.
+2. Set **Connection type** → **Raw** (not SSH, not Telnet).
+3. **Host Name:** `dap.local` (or `192.168.137.123`)
+4. **Port:** `1234`
+5. *(Optional)* Go to **Terminal → Local echo → Force on** so you can see what you type.
+6. Click **Open**.
+7. **Immediately type the baud rate** (e.g. `115200`) and press **Enter** — this is the
+   baud-rate negotiation packet. Do this before sending any other data.
+8. The UART is now running at that rate. Type commands / read responses normally.
+
+> **Tip:** Save the session (Session → Saved Sessions → "DAP-UART") to avoid
+> re-entering the host and port each time. The baud rate still needs to be sent
+> manually after each connect.
+
+**Loopback test** (GPIO20 shorted to GPIO21 — verifies all baud rates):
+
+```bat
+python tests/uart_bridge.py --loopback --all-bauds
+```
+
+Full details, use cases (SWO trace, AT commands, target console), and API reference:
+**[docs/uart_bridge.md](docs/uart_bridge.md)**
 
 
 ### elaphure-dap.js

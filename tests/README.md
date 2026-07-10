@@ -4,10 +4,111 @@ Automated test scripts for validating XIAO ESP32-C3 wireless DAP hardware.
 
 ## Test Files
 
-### 1. `test_xiao_usb.py` - USB Interface Tests
+### 0. `pyocd_elaphurelink.py` — pyOCD Probe via elaphureLink TCP (WiFi)
+
+Connects pyOCD directly to the wireless DAP over the elaphureLink TCP protocol.
+**No USB cable, no USBIP kernel driver, no extra dependencies** — only Python stdlib + pyOCD.
+
+**Features:**
+
+- elaphureLink handshake over TCP port 3240
+- Plugs into pyOCD's `DAPAccessCMSISDAP` as a drop-in bulk interface
+- CMSIS-DAP v2 (512-byte packets)
+- `make_probe(host)` API for use in other scripts / pyOCD sessions
+- Standalone test mode: verifies connection and reads DPIDR
+
+**Confirmed working (2026-07-10):**
+
+```text
+elaphureLink connected — device DAP 1.0.0 @ 192.168.137.123:3240
+DAP opened  vendor='windowsair'  product='CMSIS-DAP v2 (elaphureLink)'
+SWD port selected
+```
+
+"No ACK" on DPIDR is expected when no target MCU is wired to the DAP SWD pins.
+
+**Usage:**
+
+```bash
+# Probe test (no target required)
+python tests/pyocd_elaphurelink.py --ip 192.168.137.123
+
+# With target
+python tests/pyocd_elaphurelink.py --ip 192.168.137.123 --target max32672
+```
+
+**As a library:**
+
+```python
+from tests.pyocd_elaphurelink import make_probe
+from pyocd.core.session import Session
+
+probe = make_probe("192.168.137.123")
+with Session(probe, target_override="max32672") as session:
+    session.open()
+    t = session.target
+    t.halt()
+    print(hex(t.read_core_register("pc")))
+```
+
+**Hardware Setup:**
+
+```text
+PC WiFi ←→ Router ←→ XIAO ESP32-C3 (192.168.137.123)
+                            ↕ SWD/JTAG
+                       Target MCU (e.g. MAX32672)
+```
+
+---
+
+### 1. `uart_bridge.py` — UART TCP Bridge Terminal
+
+Interactive serial terminal (and non-interactive send/receive) over the firmware's
+UART TCP bridge.  The ESP32-C3 bridges **TCP port 1234 ↔ UART1 (GPIO21 TX / GPIO20 RX)**.
+
+**Enable in firmware first** (`main/wifi_configuration.h`):
+
+```c
+#define USE_UART_BRIDGE      1
+#define UART_BRIDGE_PORT     1234
+#define UART_BRIDGE_BAUDRATE 115200
+```
+
+Rebuild and flash, then:
+
+**Usage:**
+
+```bash
+# Interactive terminal (type → UART out, UART in → screen)
+python tests/uart_bridge.py
+
+# Explicit baud rate
+python tests/uart_bridge.py --baud 9600
+
+# Send one command, print response (non-interactive)
+python tests/uart_bridge.py --send "AT" --timeout 1.0
+
+# Log all received bytes to file
+python tests/uart_bridge.py --log uart_log.txt
+
+# Different device IP
+python tests/uart_bridge.py --ip 192.168.137.123 --port 1234
+```
+
+**Firmware baud-rate negotiation:** the first packet sent over TCP is interpreted as
+the baud rate if it is a plain ASCII number (e.g. `"115200"`).  The script handles
+this automatically — just pass `--baud`.
+
+**Alternative:** PuTTY → Connection type **Raw** → host `dap.local` → port `1234`.
+
+---
+
+### 2. `test_xiao_usb.py` - USB Interface Tests
+
 Tests DAP functionality when connected via USB cable.
 
 **Features:**
+
 - USB device detection
 - DAP information retrieval
 - VTarget voltage reading (ADC sensing)
@@ -16,7 +117,8 @@ Tests DAP functionality when connected via USB cable.
 - IDCODE reading
 
 **Hardware Setup:**
-```
+
+```text
 PC USB ←→ XIAO ESP32-C3 USB-C port
 ```
 

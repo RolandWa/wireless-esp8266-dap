@@ -5,7 +5,7 @@ set(COMPONENT_SRCS
 
 # VTarget PWM is only for ESP32-C3/ESP32-S3 XIAO boards
 if(IDF_TARGET STREQUAL "esp32c3" OR IDF_TARGET STREQUAL "esp32s3")
-    list(APPEND COMPONENT_SRCS "vtarget_pwm.c")
+    list(APPEND COMPONENT_SRCS "DAP_handle.c" "vtarget_pwm.c")
 endif()
 
 if(CONFIG_USE_WEBSOCKET_DAP)

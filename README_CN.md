@@ -178,12 +178,14 @@
 | LED\_WIFI\_STATUS      | GPIO10        |
 | VTarget Sense          | GPIO2 (ADC0)  |
 | VTarget Control (PWM)  | GPIO3         |
-| Tx                     | GPIO19        |
-| Rx                     | GPIO18        |
+| Tx                     | GPIO21        |
+| Rx                     | GPIO20        |
 
 
 > Rx和Tx用于TCP转发的串口，默认不开启该功能。
 > 
+> **注意（XIAO-ESP32-C3）：** UART引脚为GPIO21（D6/TX）和GPIO20（D7/RX）。
+>
 > VTarget通过GPIO2 (ADC0)上的1/2分压器进行感应。使用DAP供应商命令0x81读取目标电压。
 > 
 > VTarget电压可以通过GPIO3上的PWM控制（1.25V-5.0V范围）。使用DAP供应商命令0x82设置目标电压。
@@ -371,14 +373,55 @@ idf.py -p /dev/ttyS5 flash
 
 ### 对于OpenOCD用户
 
-这个项目最初是为在Keil上运行而设计的，但现在你也可以在OpenOCD上通过它来烧录程序。
+通过WiFi直接连接目标设备 — **无需USB线缆，无需USBIP内核驱动**。
 
-```bash
-> halt
-> flash write_image [erase] [unlock] filename [offset] [type]
+推荐使用elaphureLink版OpenOCD（已安装于 `c:\openocd\elaphurelink\`）：
+
+```bat
+c:\openocd\elaphurelink\bin\openocd.exe ^
+  -s c:\openocd\elaphurelink\share\openocd\scripts ^
+  -f openocd/elaphurelink.cfg ^
+  -f target/stm32f4x.cfg
 ```
 
-> 现已支持 pyOCD
+烧录 `.bin` 文件到目标（以Maxim MAX32672为例）：
+
+```bat
+openocd\flash_max32672.bat firmware.bin
+```
+
+或直接使用OpenOCD命令：
+
+```tcl
+halt
+flash write_image erase firmware.bin 0x10000000
+verify_image firmware.bin 0x10000000
+reset run
+```
+
+详见 **[docs/openocd.md](docs/openocd.md)**，包含三种连接方式（elaphureLink OpenOCD、Python桥接、pyOCD API）的完整命令示例。
+
+### 对于pyOCD用户
+
+pyOCD 0.44+ 可通过elaphureLink TCP接口直接经WiFi连接 — **无需USB驱动或USBIP**：
+
+```python
+from tests.pyocd_elaphurelink import make_probe
+from pyocd.core.session import Session
+
+probe = make_probe("192.168.137.123")   # 或 "dap.local"
+with Session(probe, target_override="your_target") as session:
+    session.open()
+    t = session.target
+    t.halt()
+    print(hex(t.read_core_register("pc")))
+```
+
+独立探针连接测试（无需接目标MCU）：
+
+```bat
+python tests/pyocd_elaphurelink.py --ip 192.168.137.123
+```
 
 ### 系统 OTA
 
@@ -424,17 +467,62 @@ esptool.py -p (PORT) flash_id
 
 ### TCP转发的串口
 
-该功能在TCP和Uart之间提供了一个桥梁：
-```
-发送数据   ->  TCP  ->  Uart TX -> 外部设备
+将 **TCP端口1234 ↔ UART1**（ESP32-C3 XIAO上的GPIO21 TX / GPIO20 RX）桥接起来。
+无需USB转串口适配器，通过WiFi即可让PC应用程序与连接到这些引脚的串行设备通信。
 
-接收数据   <-  TCP  <-  Uart Rx <- 外部设备
+```text
+PC TCP客户端（端口1234）
+  ↕  WiFi
+ESP32-C3
+  ↕  GPIO21 TX / GPIO20 RX
+目标MCU串口 / AT命令模块 / SWO跟踪
 ```
 
 ![uart_tcp_bridge](https://user-images.githubusercontent.com/17078589/150290065-05173965-8849-4452-ab7e-ec7649f46620.jpg)
 
-当TCP连接建立后，ESP芯片将尝试解决首次发送的文本。当文本是一个有效的波特率时，转发器就会切换到该波特率。例如，发送ASCII文本`115200`会将波特率切换为115200。
-由于性能原因，该功能默认不启用。你可以修改 [wifi_configuration.h](main/wifi_configuration.h) 来打开它。
+**支持的波特率：** 9600 · 14400 · 19200 · 28800 · 38400 · 56000 · 57600 · 115200
+
+**启用方式** — 修改 [main/wifi_configuration.h](main/wifi_configuration.h)：
+
+```c
+#define USE_UART_BRIDGE      1
+#define UART_BRIDGE_PORT     1234
+#define UART_BRIDGE_BAUDRATE 115200
+```
+
+**连接方式**（任选其一）：
+
+- **Python终端：** `python tests/uart_bridge.py --baud 115200`
+- **PuTTY：** 见下方详细步骤
+- **Netcat：** `ncat dap.local 1234`
+
+**波特率协商：** 建立TCP连接后，若第一个数据包内容为纯十进制数字（如 `"115200"`），
+固件会在开始转发前将UART重新配置为对应波特率。
+每次更换波特率都需要重新建立TCP连接。
+
+#### PuTTY 操作步骤
+
+1. 打开 **PuTTY**。
+2. 将 **Connection type（连接类型）** 设为 **Raw**（不是 SSH，不是 Telnet）。
+3. **Host Name（主机名）：** `dap.local`（或 `192.168.137.123`）
+4. **Port（端口）：** `1234`
+5. *（可选）* 进入 **Terminal → Local echo → Force on**，这样可以看到自己输入的内容。
+6. 点击 **Open**。
+7. 连接后 **立即输入波特率**（如 `115200`）并按 **Enter** — 这是波特率协商包，
+   必须在发送其他数据之前完成。
+8. UART 现已切换到对应波特率，可正常发送/接收数据。
+
+> **提示：** 可将该配置保存为会话（Session → Saved Sessions → "DAP-UART"），
+> 下次无需重新填写主机和端口。但每次连接后仍需手动发送波特率。
+
+**回环测试**（GPIO20短接GPIO21，验证所有波特率）：
+
+```bat
+python tests/uart_bridge.py --loopback --all-bauds
+```
+
+详细说明、使用场景（SWO跟踪、AT命令、目标控制台）及API参考：
+**[docs/uart_bridge.md](docs/uart_bridge.md)**
 
 ### elaphure-dap.js
 
