@@ -108,9 +108,11 @@ def step_install_idf():
         print("  Already installed — skipping (delete stamp to force reinstall):")
         print(f"    {stamp}")
         return
+    # Execute install.sh as a child process (not sourced) so BASH_SOURCE[0]
+    # resolves correctly and IDF can find its own tools/ directory.
     subprocess.run(
-        f'bash -c ". {IDF_DIR}/install.sh {IDF_TARGET}"',
-        shell=True, check=True,
+        ["bash", os.path.join(IDF_DIR, "install.sh"), IDF_TARGET],
+        check=True,
     )
     open(stamp, "w").close()
 
