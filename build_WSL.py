@@ -108,6 +108,14 @@ def step_install_idf():
         print("  Already installed — skipping (delete stamp to force reinstall):")
         print(f"    {stamp}")
         return
+
+    # IDF v4.4.2 idf_tools.py crashes with KeyError:'idfSelectedId' if a previous
+    # failed run left a partial idf-env.json. Remove it so install starts clean.
+    idf_env_json = os.path.expanduser("~/.espressif/idf-env.json")
+    if os.path.exists(idf_env_json):
+        print(f"  Removing stale {idf_env_json}")
+        os.remove(idf_env_json)
+
     # Execute install.sh as a child process (not sourced) so BASH_SOURCE[0]
     # resolves correctly and IDF can find its own tools/ directory.
     subprocess.run(
