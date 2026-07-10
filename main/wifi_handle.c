@@ -18,6 +18,104 @@
 #include "esp_event_loop.h"
 #include "esp_log.h"
 
+#if (USE_STATIC_IP == 1)
+#include "lwip/sockets.h"
+#include "lwip/netdb.h"
+
+// ICMP echo request header (RFC 792)
+typedef struct {
+    uint8_t  type;
+    uint8_t  code;
+    uint16_t checksum;
+    uint16_t id;
+    uint16_t seq;
+} icmp_hdr_t;
+
+static uint16_t icmp_checksum(void *data, int len) {
+    uint16_t *p = (uint16_t *)data;
+    uint32_t sum = 0;
+    while (len > 1) { sum += *p++; len -= 2; }
+    if (len)         sum += *(uint8_t *)p;
+    while (sum >> 16) sum = (sum & 0xFFFF) + (sum >> 16);
+    return (uint16_t)(~sum);
+}
+
+// Returns true if another host replies to a ping at ip_str within timeout_ms.
+static bool ip_in_use(const char *ip_str, int timeout_ms) {
+    int sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+    if (sock < 0) return false;
+
+    struct timeval tv = {
+        .tv_sec  = timeout_ms / 1000,
+        .tv_usec = (timeout_ms % 1000) * 1000,
+    };
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    struct sockaddr_in dest;
+    memset(&dest, 0, sizeof(dest));
+    dest.sin_family = AF_INET;
+    inet_aton(ip_str, &dest.sin_addr);
+
+    uint8_t pkt[sizeof(icmp_hdr_t)];
+    icmp_hdr_t *icmp = (icmp_hdr_t *)pkt;
+    icmp->type     = 8;   // ICMP_ECHO
+    icmp->code     = 0;
+    icmp->id       = htons(0xDA99);
+    icmp->seq      = htons(1);
+    icmp->checksum = 0;
+    icmp->checksum = icmp_checksum(pkt, sizeof(pkt));
+
+    sendto(sock, pkt, sizeof(pkt), 0, (struct sockaddr *)&dest, sizeof(dest));
+
+    // Any reply means the address is occupied
+    uint8_t reply[64];
+    int n = recv(sock, reply, sizeof(reply), 0);
+    close(sock);
+    return (n > 0);
+}
+
+// Expand DAP_IP_ADDRESS / DAP_IP_GATEWAY / DAP_IP_NETMASK macros into arrays.
+static const uint8_t s_def_ip[] = { DAP_IP_ADDRESS };
+static const uint8_t s_def_gw[] = { DAP_IP_GATEWAY };
+static const uint8_t s_def_nm[] = { DAP_IP_NETMASK };
+
+// Connect first with DHCP, then probe for the first free static IP starting
+// at the configured default. Increments the last octet up to 255.
+static void find_and_set_free_static_ip(void) {
+    char candidate[16];
+
+    for (int octet = s_def_ip[3]; octet <= 255; octet++) {
+        snprintf(candidate, sizeof(candidate), "%d.%d.%d.%d",
+                 s_def_ip[0], s_def_ip[1], s_def_ip[2], octet);
+
+        os_printf("Static IP probe: checking %s ...\r\n", candidate);
+
+        if (!ip_in_use(candidate, 400)) {
+            // Address appears free — stop DHCP and apply it
+            tcpip_adapter_ip_info_t info;
+            inet_aton(candidate, &info.ip);
+            IP4_ADDR(&info.gw,      s_def_gw[0], s_def_gw[1], s_def_gw[2], s_def_gw[3]);
+            IP4_ADDR(&info.netmask, s_def_nm[0], s_def_nm[1], s_def_nm[2], s_def_nm[3]);
+
+            tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA);
+            tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &info);
+
+            os_printf("Static IP assigned: %s (default was %d.%d.%d.%d)\r\n",
+                      candidate,
+                      s_def_ip[0], s_def_ip[1], s_def_ip[2], s_def_ip[3]);
+            return;
+        }
+
+        os_printf("Static IP probe: %s is taken\r\n", candidate);
+
+        if (octet == 255) {
+            os_printf("Static IP probe: no free address found in .%d-.255, keeping DHCP\r\n",
+                      s_def_ip[3]);
+        }
+    }
+}
+#endif // USE_STATIC_IP
+
 #ifdef CONFIG_IDF_TARGET_ESP8266
     #define PIN_LED_WIFI_STATUS 15
 #elif defined CONFIG_IDF_TARGET_ESP32
@@ -190,19 +288,8 @@ void wifi_init(void) {
 
     tcpip_adapter_init();
 
-#if (USE_STATIC_IP == 1)
-    tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA);
-
-    tcpip_adapter_ip_info_t ip_info;
-
-#define MY_IP4_ADDR(...) IP4_ADDR(__VA_ARGS__)
-    MY_IP4_ADDR(&ip_info.ip, DAP_IP_ADDRESS);
-    MY_IP4_ADDR(&ip_info.gw, DAP_IP_GATEWAY);
-    MY_IP4_ADDR(&ip_info.netmask, DAP_IP_NETMASK);
-#undef MY_IP4_ADDR
-
-    tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info);
-#endif // (USE_STATIC_IP == 1)
+    // Static IP is resolved after connection (see find_and_set_free_static_ip below).
+    // DHCP is used initially so the network stack is active for the IP probe.
 
     wifi_event_group = xEventGroupCreate();
 
@@ -219,4 +306,8 @@ void wifi_init(void) {
 
 
     wait_for_ip();
+
+#if (USE_STATIC_IP == 1)
+    find_and_set_free_static_ip();
+#endif
 }
