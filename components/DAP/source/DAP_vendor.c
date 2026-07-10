@@ -58,22 +58,22 @@ static void vtarget_adc_init(void) {
     if (adc_initialized) {
         return;
     }
-    
+
     // Configure ADC1 width (12-bit resolution)
     adc1_config_width(ADC_WIDTH_BIT_12);
-    
+
     // Configure ADC1 Channel 2 (GPIO2) with 11dB attenuation (0-3.3V range)
     adc1_config_channel_atten(ADC1_CHANNEL_2, ADC_ATTEN_DB_11);
-    
+
     // Characterize ADC for calibration
     adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
     if (!adc_chars) {
         ESP_LOGE(TAG, "Failed to allocate ADC calibration memory");
         return;
     }
-    
+
     esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, adc_chars);
-    
+
     adc_initialized = true;
     ESP_LOGI(TAG, "VTarget ADC initialized on GPIO2 (ADC1_CH2), calibration type: %d", val_type);
 }
@@ -85,40 +85,40 @@ static uint16_t vtarget_read_mv(void) {
     if (!adc_initialized) {
         vtarget_adc_init();
     }
-    
+
     if (!adc_chars) {
         ESP_LOGE(TAG, "ADC not initialized or calibration failed");
         return 0xFFFF;  // Error indicator
     }
-    
+
     uint32_t voltage_sum = 0;
     uint8_t valid_samples = 0;
-    
+
     // Read ADC 20 times and average
     for (int i = 0; i < 20; i++) {
         int adc_raw = adc1_get_raw(ADC1_CHANNEL_2);
-        
+
         if (adc_raw < 0) {
             continue;
         }
-        
+
         // Convert to voltage using calibration
         uint32_t voltage_mv = esp_adc_cal_raw_to_voltage(adc_raw, adc_chars);
-        
+
         voltage_sum += voltage_mv;
         valid_samples++;
     }
-    
+
     if (valid_samples == 0) {
         ESP_LOGW(TAG, "No valid ADC samples obtained");
         return 0xFFFF;  // Error indicator
     }
-    
+
     // Calculate average and compensate for 1/2 voltage divider (multiply by 2)
     uint16_t avg_voltage = (uint16_t)(voltage_sum / valid_samples);
     uint16_t result = avg_voltage * 2;
-    
-    ESP_LOGI(TAG, "VTref read: %d mV (raw avg: %d mV, samples: %d)", result, avg_voltage, valid_samples);
+
+    ESP_LOGI(TAG, "VTarget read: %d mV (raw avg: %d mV, samples: %d)", result, avg_voltage, valid_samples);
     return result;
 }
 
@@ -203,10 +203,10 @@ uint32_t DAP_ProcessVendorCommand(const uint8_t *request, uint8_t *response) {
         uint8_t voltage_low = *request++;
         uint8_t voltage_high = *request++;
         uint16_t voltage_mv = (uint16_t)voltage_low | ((uint16_t)voltage_high << 8);
-        
+
         ESP_LOGI(TAG, "Set VTarget request: %d mV", voltage_mv);
         esp_err_t ret = vtarget_set_voltage(voltage_mv);
-        
+
         if (ret == ESP_OK) {
           *response++ = 0x00;  // Success
           ESP_LOGI(TAG, "VTarget set successfully to %d mV", voltage_mv);
