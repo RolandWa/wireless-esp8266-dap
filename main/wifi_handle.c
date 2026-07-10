@@ -267,7 +267,10 @@ static void ssid_change() {
     wifi_config.sta.password[sizeof(wifi_config.sta.password) - 1] = '\0';
     os_printf("Trying to connect to: %s (attempt %d/%d)\r\n", 
               wifi_list[ssid_index].ssid, retry_count + 1, MAX_RETRY_PER_NETWORK);
-    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
+    esp_err_t err = esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config);
+    if (err != ESP_OK) {
+        ESP_LOGW("wifi", "esp_wifi_set_config failed: %s — skipping", esp_err_to_name(err));
+    }
 }
 
 static void wait_for_ip() {

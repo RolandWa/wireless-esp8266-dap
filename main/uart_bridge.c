@@ -236,11 +236,12 @@ void uart_bridge_task() {
         if (ret != pdTRUE) {
             // timeout
             if (is_conn_valid) {
-                ESP_ERROR_CHECK(uart_get_buffered_data_len(UART_BRIDGE_RX, &uart_buf_len));
-                uart_buf_len = uart_buf_len > UART_BUF_SIZE ? UART_BUF_SIZE : uart_buf_len;
-                uart_buf_len = uart_read_bytes(UART_BRIDGE_RX, uart_read_buffer, uart_buf_len, pdMS_TO_TICKS(5));
-                // then send data
-                netconn_write(uart_netconn, uart_read_buffer, uart_buf_len, NETCONN_COPY);
+                if (uart_get_buffered_data_len(UART_BRIDGE_RX, &uart_buf_len) == ESP_OK && uart_buf_len > 0) {
+                    uart_buf_len = uart_buf_len > UART_BUF_SIZE ? UART_BUF_SIZE : uart_buf_len;
+                    uart_buf_len = uart_read_bytes(UART_BRIDGE_RX, uart_read_buffer, uart_buf_len, pdMS_TO_TICKS(5));
+                    if (uart_buf_len > 0)
+                        netconn_write(uart_netconn, uart_read_buffer, uart_buf_len, NETCONN_COPY);
+                }
             }
         } else if (events.type == NETCONN_EVT_WIFI_DISCONNECTED) { // WIFI disconnected
             if (is_conn_valid) {
@@ -274,12 +275,13 @@ void uart_bridge_task() {
             //     tcp_nagle_disable(events.nc->pcb.tcp);
 
             uart_netconn = events.nc;
-            // read data from UART
-            ESP_ERROR_CHECK(uart_get_buffered_data_len(UART_BRIDGE_RX, &uart_buf_len));
-            uart_buf_len = uart_buf_len > UART_BUF_SIZE ? UART_BUF_SIZE : uart_buf_len;
-            uart_buf_len = uart_read_bytes(UART_BRIDGE_RX, uart_read_buffer, uart_buf_len, pdMS_TO_TICKS(5));
-            // then send data
-            netconn_write(events.nc, uart_read_buffer, uart_buf_len, NETCONN_COPY);
+            // flush any pending UART→TCP data before processing incoming TCP data
+            if (uart_get_buffered_data_len(UART_BRIDGE_RX, &uart_buf_len) == ESP_OK && uart_buf_len > 0) {
+                uart_buf_len = uart_buf_len > UART_BUF_SIZE ? UART_BUF_SIZE : uart_buf_len;
+                uart_buf_len = uart_read_bytes(UART_BRIDGE_RX, uart_read_buffer, uart_buf_len, pdMS_TO_TICKS(5));
+                if (uart_buf_len > 0)
+                    netconn_write(events.nc, uart_read_buffer, uart_buf_len, NETCONN_COPY);
+            }
 
             // try to get data
             if ((netconn_recv(events.nc, &netbuf)) == ERR_OK) // data incoming ?

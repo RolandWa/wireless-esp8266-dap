@@ -68,10 +68,14 @@ At boot: `vtarget_pwm_init()` is called and the default is set to 3300 mV.
 
 ### Serial debug commands (115200 baud, COM12)
 
-| Key | Action |
-|-----|--------|
+Commands are line-based — type the command and press **Enter**.
+
+| Command | Action |
+| ------- | ------ |
 | `v` | Read VTref voltage once |
-| `s` | Print status: IP · RSSI · VTref · free heap |
+| `s` | Print status: IP, RSSI, VTref, free heap |
+| `h` / `?` | Print help |
+| `reboot` | Reboot the device (full word required - prevents accidental trigger from stale bytes) |
 
 ### C API (internal)
 

@@ -406,7 +406,7 @@ Even pins: 2:VTref  4:GND    6:GND     8:GND    10:GND    12:GND      14:GND    
   - GPIO20 (D7): UART RX (receives data from target SWO/RTT)
   - GPIO21 (D6): UART TX (sends data to target)
 - Enables SWO trace and RTT debugging without additional cables
-- Configure via `USE_UART_BRIDGE` in [main/wifi_configuration.h](main/wifi_configuration.h)
+- Configure via `USE_UART_BRIDGE` in [main/wifi_configuration.h](../../main/wifi_configuration.h)
 
 ### VTarget Power Supply Capability
 ```

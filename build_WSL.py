@@ -277,7 +277,14 @@ def step_build(clean=False):
             sz = os.path.getsize(f)
             print(f"  {os.path.basename(f):40s}  {sz:>8,} bytes  ({sz/1024:.1f} kB)")
 
-    print(f"\n  Flash with:  flash_esp.bat")
+    # Copy the merged binary back to the Windows repo directory so flash_eps.bat works
+    win_repo = os.path.dirname(os.path.abspath(__file__))
+    win_bin  = os.path.join(win_repo, "wireless_esp_dap_full.bin")
+    if os.path.exists(full_bin):
+        shutil.copy2(full_bin, win_bin)
+        print(f"  Copied to:   {win_bin}")
+
+    print(f"\n  Flash with:  flash_eps.bat")
     print(f"  Full binary: {full_bin}")
     print(f"\n  Done.")
 

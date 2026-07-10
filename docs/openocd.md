@@ -159,12 +159,28 @@ pyOCD → localhost:3333 (GDB) → OpenOCD (elaphureLink) → device
 
 OpenOCD (Path 1) exposes a GDB server.  pyOCD can attach to GDB servers.
 
-### Option B — pyOCD custom elaphureLink probe plugin
+### Option B — pyOCD custom elaphureLink probe plugin ✓ Implemented
 
-pyOCD supports custom `Probe` implementations via its plugin system.  A plugin
-that wraps the elaphureLink TCP connection as a CMSIS-DAP probe would allow
-pyOCD to talk to this device natively.  Not yet implemented — the Python
-elaphureLink client code above is the foundation.
+[tests/pyocd_elaphurelink.py](../tests/pyocd_elaphurelink.py) implements a
+`_ElaphureLinkInterface` that plugs into pyOCD 0.44.1's `DAPAccessCMSISDAP`
+class, wrapping the elaphureLink TCP connection as a CMSIS-DAP bulk interface.
+Confirmed working: handshake, DAP open, SWD connect (no ACK is expected without
+a physical target wired to the SWD pins).
+
+```python
+from tests.pyocd_elaphurelink import make_probe
+
+probe = make_probe("192.168.137.123")
+probe.open()
+probe.connect()
+# probe is now a fully functional pyOCD CMSISDAPProbe over WiFi
+```
+
+Run the standalone test:
+
+```bat
+python tests/pyocd_elaphurelink.py --ip 192.168.137.123
+```
 
 ---
 

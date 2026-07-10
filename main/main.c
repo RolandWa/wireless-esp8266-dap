@@ -85,10 +85,10 @@ static void print_debug_status(void) {
 
 static void print_help(void) {
     ESP_LOGI(DBG_TAG, "=== UART Debug Commands ===");
-    ESP_LOGI(DBG_TAG, "  v - Read VTref voltage");
-    ESP_LOGI(DBG_TAG, "  s - Print full status");
-    ESP_LOGI(DBG_TAG, "  h - Print this help");
-    ESP_LOGI(DBG_TAG, "  r - Reboot device");
+    ESP_LOGI(DBG_TAG, "  v      - Read VTref voltage");
+    ESP_LOGI(DBG_TAG, "  s      - Print full status");
+    ESP_LOGI(DBG_TAG, "  h / ?  - Print this help");
+    ESP_LOGI(DBG_TAG, "  reboot - Reboot device (full word required)");
     ESP_LOGI(DBG_TAG, "===========================");
 }
 
@@ -103,12 +103,20 @@ static void debug_task(void *arg) {
     };
     uart_param_config(UART_NUM_0, &uart_cfg);
     uart_driver_install(UART_NUM_0, 256, 0, 0, NULL, 0);
+    uart_flush_input(UART_NUM_0);  // discard stale bytes left by esptool after flash/reset
 
     ESP_LOGI(DBG_TAG, "Debug task started. Press 'h' for commands.");
     print_help();
 
     TickType_t last_status = xTaskGetTickCount();
     const TickType_t STATUS_INTERVAL = pdMS_TO_TICKS(5000); // 5s periodic
+
+    // Line buffer — commands are processed on Enter (\r or \n).
+    // Single-char commands (v, s, h) fire immediately on Enter.
+    // Reboot requires the full word "reboot" to prevent accidental triggering
+    // by stale bytes left in the UART buffer after flashing.
+    char line[16];
+    int  line_len = 0;
 
     while (1) {
         // Periodic status log
@@ -117,39 +125,46 @@ static void debug_task(void *arg) {
             last_status = xTaskGetTickCount();
         }
 
-        // Check for UART command
-        uint8_t cmd;
-        int len = uart_read_bytes(UART_NUM_0, &cmd, 1, pdMS_TO_TICKS(100));
-        if (len > 0) {
-            switch (cmd) {
-                case 'v': case 'V':
+        uint8_t ch;
+        if (uart_read_bytes(UART_NUM_0, &ch, 1, pdMS_TO_TICKS(100)) <= 0)
+            continue;
+
+        if (ch == '\r' || ch == '\n') {
+            // Terminate and process line
+            line[line_len] = '\0';
+
+            // Lower-case in place for case-insensitive match
+            for (int i = 0; i < line_len; i++)
+                if (line[i] >= 'A' && line[i] <= 'Z') line[i] += 32;
+
+            if (line_len == 1 && line[0] == 'v') {
 #if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
-                    {
-                        uint16_t mv = vtarget_read_mv_public();
-                        if (mv == 0xFFFF)
-                            ESP_LOGI(DBG_TAG, "VTref: ADC read error");
-                        else
-                            ESP_LOGI(DBG_TAG, "VTref: %d mV (%.3f V)", mv, mv / 1000.0f);
-                    }
+                uint16_t mv = vtarget_read_mv_public();
+                if (mv == 0xFFFF)
+                    ESP_LOGI(DBG_TAG, "VTref: ADC read error");
+                else
+                    ESP_LOGI(DBG_TAG, "VTref: %d mV (%.3f V)", mv, mv / 1000.0f);
 #else
-                    ESP_LOGI(DBG_TAG, "VTref sensing not supported on this target");
+                ESP_LOGI(DBG_TAG, "VTref sensing not supported on this target");
 #endif
-                    break;
-                case 's': case 'S':
-                    print_debug_status();
-                    break;
-                case 'h': case 'H': case '?':
-                    print_help();
-                    break;
-                case 'r': case 'R':
-                    ESP_LOGW(DBG_TAG, "Rebooting...");
-                    vTaskDelay(pdMS_TO_TICKS(200));
-                    esp_restart();
-                    break;
-                default:
-                    break;
+            } else if (line_len == 1 && line[0] == 's') {
+                print_debug_status();
+            } else if (line_len == 1 && (line[0] == 'h' || line[0] == '?')) {
+                print_help();
+            } else if (strcmp(line, "reboot") == 0) {
+                ESP_LOGW(DBG_TAG, "Rebooting...");
+                vTaskDelay(pdMS_TO_TICKS(200));
+                esp_restart();
+            } else if (line_len > 0) {
+                ESP_LOGW(DBG_TAG, "Unknown command '%s' — type 'h' for help", line);
             }
+
+            line_len = 0;
+        } else if (ch >= 0x20 && line_len < (int)(sizeof(line) - 1)) {
+            // Printable character — accumulate
+            line[line_len++] = (char)ch;
         }
+        // Ignore control characters other than CR/LF
     }
 }
 

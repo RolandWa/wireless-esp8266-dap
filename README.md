@@ -323,7 +323,7 @@ A complete hardware design for the Seeed Studio XIAO ESP32-C3 module is availabl
 
 **Programmable VTarget Implementation:**
 
-For ESP32-C3 XIAO designs, a programmable target voltage feature (1.25V-5V) is available using PWM-controlled voltage regulation. See the detailed implementation guide: [VTARGET_PWM_IMPLEMENTATION.md](VTARGET_PWM_IMPLEMENTATION.md)
+For ESP32-C3 XIAO designs, a programmable target voltage feature (1.25V-5V) is available using PWM-controlled voltage regulation. See the detailed implementation guide: [VTARGET_PWM_IMPLEMENTATION.md](circuit_ESP32C3_Xiao/documentations/VTARGET_PWM_IMPLEMENTATION.md)
 
 ***Alternatively, you can connect directly with wires as we gave at the beginning, without additional circuits.***
 

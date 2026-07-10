@@ -218,7 +218,7 @@
 | TVCC               | 3V3    |
 | GND                | GND    |
 
-
+</details>
 
 ----
 
@@ -239,29 +239,47 @@
 
 ## 编译固件并烧写
 
-你可以在本地构建或使用Github Action在线构建固件，然后下载固件进行烧写。
+你可以在本地（WSL）构建，或使用 GitHub Actions 在线构建固件后下载烧写。
 
-### 使用Github Action在线构建固件
+### 使用 GitHub Actions 在线构建
 
-详见：[Build with Github Action](https://github.com/windowsair/wireless-esp8266-dap/wiki/Build-with-Github-Action)
+推送代码到分支后，CI 会自动运行并将固件作为构建产物上传。
+详见 [.github/workflows/main.yml](.github/workflows/main.yml)。
 
-### 在本地构建并烧写
+### 本地构建 — WSL / Windows（推荐）
 
+> 完整说明、故障排除和环境注意事项：**[docs/build_wsl.md](docs/build_wsl.md)**
+
+**环境要求：** WSL2 Ubuntu、Python 3.10（自动安装）、ESP-IDF **v4.4.2**。
+
+```bash
+# 在 WSL Ubuntu 终端中运行 — 首次使用（含环境安装 + 编译）：
+python3 build_WSL.py
+
+# 后续编译（环境已安装好）：
+python3 build_WSL.py --build
+
+# 清理后重新编译：
+python3 build_WSL.py --build --clean
+```
+
+脚本会自动安装所有依赖、克隆 ESP-IDF v4.4.2、编译固件，并将所有内容合并到
+`~/build_wireless_dap/wireless_esp_dap_full.bin`，同时自动复制回 Windows 目录。
+
+**烧写到设备（Windows，COM12）：**
+
+```bat
+flash_eps.bat
+```
+
+> **务必使用 ESP-IDF v4.4.2。** 本代码库针对 v4.4 API 开发，使用 IDF v5+ 需要大量源码修改，不予支持。
+
+### ESP8266 构建
 
 <details>
 <summary>ESP8266</summary>
 
-1. 获取ESP8266 SDK
-
-    项目中已经随附了一个SDK。请不要使用其他版本的SDK。
-
-2. 编译和烧写
-
-    使用ESP-IDF编译系统进行构建。
-    更多的信息，请见：[Build System](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html "Build System")
-
-
-下面例子展示了在Windows上完成这些任务的一种可行方法：
+项目中已随附 SDK，请勿使用其他版本。
 
 ```bash
 # 编译
