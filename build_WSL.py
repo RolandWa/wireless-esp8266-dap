@@ -8,10 +8,13 @@ Replicates the GitHub CI environment exactly:
   - Merges bootloader + partition table + app into one flashable binary
   - esptool v4.6.2 (same as CI)
 
-Usage (inside WSL Ubuntu terminal):
-    python3 build_WSL.py            # full setup + build
-    python3 build_WSL.py --build    # build only (skip setup if already done)
-    python3 build_WSL.py --clean    # clean build directory first
+Usage — from Windows PowerShell / CMD (no WSL terminal needed):
+    python build_WSL.py            # full setup + build
+    python build_WSL.py --build    # build only (skip setup if already done)
+    python build_WSL.py --clean    # clean build directory first
+
+Usage — from inside a WSL Ubuntu terminal:
+    python3 build_WSL.py --build
 """
 
 import argparse
@@ -19,6 +22,32 @@ import os
 import shutil
 import subprocess
 import sys
+
+# ── Windows launcher ──────────────────────────────────────────────────────────
+# When run from Windows, convert this script's path to a WSL /mnt/... path and
+# re-exec inside WSL so the rest of the script runs natively on Linux.
+# __file__ will then be the /mnt/c/... path, giving correct rsync source and
+# copy-back destination for free.
+def _relaunch_in_wsl():
+    """If running on Windows, re-exec this script inside WSL and exit."""
+    if sys.platform != "win32":
+        return  # already in WSL or native Linux
+
+    script = os.path.abspath(__file__)
+
+    # Convert Windows path  C:\foo\bar  →  /mnt/c/foo/bar
+    drive, rest = os.path.splitdrive(script)          # e.g. "C:", "\foo\bar"
+    wsl_path = "/mnt/" + drive[0].lower() + rest.replace("\\", "/")
+
+    print(f"Detected Windows — launching inside WSL: {wsl_path}")
+    result = subprocess.run(
+        ["wsl", "python3", wsl_path] + sys.argv[1:],
+        check=False,
+    )
+    sys.exit(result.returncode)
+
+
+_relaunch_in_wsl()  # no-op when already inside WSL
 
 # ── Configuration (mirrors CI exactly) ────────────────────────────────────────
 IDF_VERSION     = "v4.4.2"
