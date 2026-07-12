@@ -78,7 +78,47 @@ There is built-in ipv4 only mDNS server. You can access the device using `dap.lo
 
 ![mDNS](https://user-images.githubusercontent.com/17078589/149659052-7b29533f-9660-4811-8125-f8f50490d762.png)
 
+#### Static IP assignment (ESP32-C3 / ESP32-S3)
 
+When `USE_STATIC_IP 1` is set in [main/wifi_configuration.h](main/wifi_configuration.h), the
+device does **not** use a fixed static IP directly. Instead it uses a two-phase approach:
+
+1. **Connect via DHCP** — the WiFi stack gets any IP from the router so the network is reachable.
+2. **Probe for a free address** — starting from the configured `DAP_IP_ADDRESS` (default
+   `192.168.137.123`), the firmware sends an ICMP ping and waits 400 ms.
+   - No reply → address is free → DHCP is stopped and that address is assigned statically.
+   - Reply received → address is taken → last octet is incremented and the next candidate is probed.
+   - This repeats up to `.255`; if no free address is found, DHCP is kept.
+
+**Default configuration** (`wifi_configuration.h`):
+
+```
+DAP_IP_ADDRESS  192.168.137.123   ← starting candidate
+DAP_IP_GATEWAY  192.168.137.1
+DAP_IP_NETMASK  255.255.255.0
+```
+
+**Behaviour with multiple devices (same firmware binary):**
+
+```
+Device A boots  →  pings .123  →  free  →  takes 192.168.137.123
+Device B boots  →  pings .123  →  taken →  pings .124  →  free  →  takes 192.168.137.124
+Device C boots  →  pings .123  →  taken →  .124 taken  →  .125  →  takes 192.168.137.125
+```
+
+Each device claims the next free address in the range automatically — no configuration change needed
+per device. The address a device gets depends on **boot order**, not on a fixed assignment.
+
+> **Note:** If two devices reboot simultaneously they may both ping `.123` before either has
+> claimed it, and both attempt to take the same address. For a lab with multiple devices where
+> stable, predictable IPs are required across reboots, use the NVS provisioning approach
+> described in the [TODO / Future Work](#todo--future-work) section.
+
+#### AP fallback mode
+
+If all configured SSIDs fail (after 5 attempts each), the device switches to **Access Point mode**
+using the second entry in `wifi_list` (`DAP` / `12345678` by default). The AP IP is always
+`192.168.4.1`. The LED stays on to indicate AP mode is active.
 
 ### Debugger
 
