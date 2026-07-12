@@ -631,6 +631,53 @@ CONFIG_USE_WEBSOCKET_DAP=y
 
 ----
 
+## TODO / Future Work
+
+### Hardware — not yet assembled / tested
+
+- [ ] **VTarget PWM circuit** — assemble AP1117-ADJ + MOSFET (Q1, R4, R5, R6, R7, C2, C3) on PCB;
+  firmware (GPIO3 LEDC) is ready and confirmed sending commands correctly
+- [ ] **VTarget calibration** — after hardware assembly, measure actual output with a multimeter at
+  1.25 V, 1.8 V, 2.5 V, 3.3 V, 5.0 V and compare against requested voltage.
+  If deviation > ~5%, replace the linear interpolation in `vtarget_set_voltage()` with a
+  calibration lookup table (see `main/vtarget_pwm.c` and `docs/vtarget.md`)
+
+### Testing — confirmed working in software, not yet exercised on real hardware
+
+- [ ] **OpenOCD with a real SWD target** — `dap info` confirmed; run full debug session
+  (e.g. STM32F4 or MAX32672) via `openocd/elaphurelink.cfg`
+- [ ] **MAX32672 flash** — run `openocd/flash_max32672.bat` against real hardware
+- [ ] **pyOCD with a real SWD target** — `make_probe()` handshake confirmed; test actual
+  register read/write with a target connected to the SWD pins
+- [ ] **UART bridge loopback at multiple baud rates** — 115200 confirmed; run
+  `python tests/uart_bridge.py --loopback --all-bauds` with a loopback jumper on GPIO20/21
+- [ ] **VTarget ADC accuracy** — cross-check 5216 mV reading against a calibrated meter
+
+### Firmware — known issues from code review
+
+- [ ] **`uart_bridge.c` — `uart_read_bytes` return type**: result (int, can be -1 on error)
+  stored in `size_t uart_buf_len`; on error -1 becomes SIZE_MAX and is passed to
+  `netconn_write` → buffer overread. Fix: use a separate `int n = uart_read_bytes(...);
+  if (n > 0) netconn_write(..., (size_t)n, ...)`.
+- [ ] **`uart_bridge.c` — `netconn_write` error ignored**: failed write (remote disconnect)
+  leaves `is_conn_valid = true`; task loops retrying forever. Fix: check return value and
+  clear `is_conn_valid` on `ERR_CLSD` / `ERR_RST`.
+- [ ] **`uart_bridge.c` — double queue create**: `uart_bridge_init()` and `uart_bridge_task()`
+  both call `xQueueCreate` for `uart_server_events`, leaking the first queue.
+  Fix: remove the `xQueueCreate` call from `uart_bridge_init()`.
+- [ ] **TCP keepalive** — no keepalive on the elaphureLink or USBIP sockets; a stale
+  connection keeps the server blocked until a new client connects.
+
+### Future features
+
+- [ ] **xPack OpenOCD TCP bridge** (`openocd/cmsis_dap_tcp_bridge.py`) — packet framing
+  for the xPack `cmsis-dap backend tcp` mode not yet matched; Path 3 is WIP
+- [ ] **WebSocket DAP** — firmware advertises the WebSocket protocol variant; no client
+  or test exists yet
+- [ ] **SWO / trace capture** — firmware advertises SWO Manchester; no capture client tested
+
+----
+
 ## Develop
 
 Check other branches to know the latest development progress.

@@ -131,7 +131,12 @@ esp_err_t vtarget_set_voltage(uint16_t voltage_mv)
     } else if (voltage_mv <= VTARGET_MIN_VOLTAGE_MV) {
         duty_cycle = VTARGET_PWM_MAX_DUTY;  // Minimum voltage, MOSFET ON
     } else {
-        // Linear interpolation (may need calibration)
+        // TODO: confirmed the PWM voltage works correct to setup target voltage
+        // The linear interpolation below assumes a perfectly linear MOSFET/AP1117-ADJ
+        // response across the full 1.25V-5V range. Measure actual VTarget output at
+        // several set-points (e.g. 1.8V, 2.5V, 3.3V, 5.0V) with a multimeter and
+        // compare against the requested voltage_mv. If deviation > ~5%, replace with
+        // a lookup table or polynomial fit using measured calibration points.
         // duty = MAX_DUTY * (MAX_V - target_V) / (MAX_V - MIN_V)
         uint32_t voltage_range = VTARGET_MAX_VOLTAGE_MV - VTARGET_MIN_VOLTAGE_MV;
         uint32_t voltage_offset = VTARGET_MAX_VOLTAGE_MV - voltage_mv;

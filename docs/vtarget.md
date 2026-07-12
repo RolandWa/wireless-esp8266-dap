@@ -12,7 +12,7 @@ every 5 seconds.
 ### Sensing (Vendor1 — working)
 
 | Signal | GPIO | Notes |
-|--------|------|-------|
+| ------ | ---- | ----- |
 | VTref sense | GPIO2 (ADC1_CH2) | Through a 1:2 resistive divider — firmware doubles the reading |
 | ADC range | 0 – 3.1 V (11 dB attenuation) | Raw range after divider |
 | VTref range | 0 – 6.2 V | After ×2 compensation |
@@ -37,6 +37,12 @@ The circuit topology in `main/vtarget_pwm.c`:
 
 PWM: 1 kHz, 10-bit resolution (0–1023).  Duty 0% = MOSFET off = 5 V output;
 duty 100% = MOSFET on = 1.25 V output.  Linear interpolation between extremes.
+
+> **TODO:** Confirm the PWM voltage output is correct across the full range.
+> Measure VTarget with a multimeter at several set-points (1.8 V, 2.5 V, 3.3 V, 5.0 V)
+> and compare against the requested value.  If deviation exceeds ~5%, the linear
+> interpolation in `vtarget_set_voltage()` (`main/vtarget_pwm.c`) needs to be
+> replaced with a calibration lookup table or polynomial fit.
 
 At boot: `vtarget_pwm_init()` is called and the default is set to 3300 mV.
 
@@ -97,7 +103,7 @@ uint16_t  vtarget_get_duty_raw(void);
 
 ### Correct method — USBIP over TCP (`tests/read_vtarget_tcp.py`)
 
-```
+```bat
 # Read VTarget
 python tests/read_vtarget_tcp.py [--ip <esp32-ip>]
 
@@ -109,7 +115,8 @@ python tests/read_vtarget_tcp.py --set 1800
 No extra dependencies (only Python standard library).  Default IP: `192.168.137.123`.
 
 Expected output (read):
-```
+
+```text
 Connecting to 192.168.137.123:3240 ...
   Attached (version=0x0111, status=OK)
 
@@ -120,7 +127,8 @@ Sending DAP_Vendor1 (0x81): read VTarget ...
 ```
 
 Expected output (set + read):
-```
+
+```text
 Connecting to 192.168.137.123:3240 ...
   Attached (version=0x0111, status=OK)
 
@@ -184,7 +192,7 @@ start_frame  npackets=0xFFFFFFFF  interval  setup[8]
 
 The firmware responds with a 48-byte header plus payload (for IN):
 
-```
+```text
 cmd=0x00000003  seqnum  devid  direction  ep  status  actual_length
 start_frame  npackets  error_count  setup[8]
 [data bytes for IN, actual_length bytes]
@@ -242,7 +250,7 @@ the old connection automatically when a new one arrives.
 ## Firmware implementation files
 
 | File | Role |
-|------|------|
+| ---- | ---- |
 | `components/DAP/source/DAP_vendor.c` | ADC init, `vtarget_read_mv()`, Vendor1 + Vendor2 handlers |
 | `main/vtarget_pwm.c` | `vtarget_set_voltage()` — PWM control via LEDC (ESP32-C3/S3 only) |
 | `main/vtarget_pwm.h` | Public API + convenience macros (`VTARGET_SET_3V3()` etc.) |
