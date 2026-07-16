@@ -192,6 +192,52 @@ Additionally, the AP1117-5 needs ≥ 6.3 V input to regulate to 5 V; running fro
 
 ---
 
+## 9. VTarget PWM + DMM Cross-Check
+
+**Script:** `tests/pwm_vtarget_dmm.py`  
+**Instrument:** NI VB-8034 DMM (V terminal on VTarget pad, COM on GND)  
+**Wiring:** VTarget output shorted to VTref (GPIO2 ADC)  
+**LDO assembled:** AP1117-3.3 (fixed 3.3 V, SOT-223)  
+**Sweep:** 0%, 10%, 20%, … 100% duty cycle  
+**Test date:** 2026-07-16
+
+### 9.1 Results Table
+
+| Duty % | Set (mV) | ADC (mV) | DMM (mV) | Diff (mV) |
+| --- | --- | --- | --- | --- |
+| 0 | 5000 | 4254 | 4244.1 | −9.9 |
+| 10 | 4626 | 4254 | 4243.7 | −10.3 |
+| 20 | 4249 | 4256 | 4243.9 | −12.1 |
+| 30 | 3875 | 4252 | 4243.7 | −8.3 |
+| 40 | 3501 | 4256 | 4243.9 | −12.1 |
+| 50 | 3123 | 4256 | 4244.3 | −11.7 |
+| 60 | 2749 | 4254 | 4244.0 | −10.0 |
+| 70 | 2375 | 4256 | 4243.2 | −12.8 |
+| 80 | 2001 | 4256 | 4244.1 | −11.9 |
+| 90 | 1624 | 4254 | 4243.6 | −10.4 |
+| 100 | 1250 | 4254 | 4243.1 | −10.9 |
+
+### 9.2 Summary
+
+| Parameter | Result | Status |
+| --- | --- | --- |
+| ADC vs DMM agreement | **±13 mV max, 11 mV avg** | ✅ PASS — ADC accurate |
+| VTarget response to PWM | **0 mV variation** across 0–100% duty | ❌ FAIL — LDO in dropout |
+| DMM VTarget range | **4243–4244 mV** (constant) | — |
+
+**Root cause: AP1117-3.3 in dropout.**
+
+The XIAO board has a Schottky diode on the USB input (≈ 0.5–0.7 V drop), leaving only ≈ 4.3–4.4 V at the AP1117-3.3 input. The AP1117 requires ≥ **4.6 V** input to regulate to 3.3 V (1.3 V minimum dropout). Operating below this threshold the LDO passes through `Vin − Vdropout ≈ 4.25 V` regardless of PWM duty cycle — identical symptom to the AP1117-5 tested in Section 7.
+
+**ADC calibration confirmed good:** Vendor1 reads within 11 mV of the DMM across the full sweep.
+
+**Hardware fix options (not yet implemented):**
+- Bypass the XIAO Schottky diode to provide full USB 5 V to AP1117 input
+- Replace AP1117-3.3 with a low-dropout regulator (Vdropout ≤ 0.3 V, e.g. MCP1700-3302)
+- Feed AP1117 IN directly from USB VBUS before the Schottky
+
+---
+
 ## TODO
 
 - [x] **UART pins high-Z by default — activate only on TCP client connect** — implemented in `uart_bridge.c`: `uart_pins_highz()` called at task start (boot state); `uart_enable()` called on TCP `accept()` (installs driver, activates pins); `uart_disable()` called on TCP disconnect and WiFi disconnect (deletes driver, returns pins to `GPIO_MODE_INPUT`). Safe to connect to targets that hard-wire programmer TX to GND.
