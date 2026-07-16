@@ -224,6 +224,108 @@ def loopback_test(ip: str, port: int, baud: int, all_bauds: bool):
         print("Check: GPIO20 (D7/RX) shorted to GPIO21 (D6/TX) ?")
 
 
+def stress_test(ip: str, port: int, baud: int, duration_s: int):
+    """
+    Continuous loopback stress test for `duration_s` seconds at a single baud rate.
+    Sends sequential 32-byte packets and verifies every echo.
+    Reports bytes transferred, packet count, error count, and throughput.
+    """
+    import os
+
+    PACKET_SIZE = 32
+    byte_time_ms = 10_000 / baud
+    pkt_timeout = max(2.0, (PACKET_SIZE * byte_time_ms / 1000) * 6 + 0.5)
+
+    print(f"UART bridge stress test")
+    print(f"  Device   : {ip}:{port}")
+    print(f"  Baud     : {baud}")
+    print(f"  Duration : {duration_s} s")
+    print(f"  Wiring   : GPIO20 (D7/RX) shorted to GPIO21 (D6/TX)")
+    print(f"  Pkt size : {PACKET_SIZE} bytes\n")
+
+    sock = connect(ip, port, baud)
+    sock.settimeout(pkt_timeout)
+
+    total_sent = 0
+    total_recv = 0
+    total_pkts = 0
+    errors      = 0
+    reconnects  = 0
+    seq         = 0
+    t_start     = time.monotonic()
+    t_report    = t_start + 5.0
+    t_end       = t_start + duration_s
+
+    def _make_packet(n: int) -> bytes:
+        # 4-byte little-endian sequence number + pseudorandom fill + \r\n
+        header = n.to_bytes(4, "little")
+        body   = bytes((n * 6364136223846793005 + i) & 0xFF for i in range(PACKET_SIZE - 6))
+        return header + body + b"\r\n"
+
+    print(f"  {'Elapsed':>8}  {'Pkts':>8}  {'Errors':>6}  {'KB sent':>8}  {'Kbps':>8}")
+    print(f"  {'─'*8}  {'─'*8}  {'─'*6}  {'─'*8}  {'─'*8}")
+
+    while time.monotonic() < t_end:
+        payload = _make_packet(seq)
+        seq += 1
+
+        try:
+            sock.sendall(payload)
+            total_sent += len(payload)
+
+            received = b""
+            deadline = time.monotonic() + pkt_timeout
+            while len(received) < len(payload) and time.monotonic() < deadline:
+                chunk = sock.recv(len(payload) - len(received))
+                if not chunk:
+                    raise OSError("connection closed")
+                received += chunk
+
+            total_recv += len(received)
+            total_pkts += 1
+
+            if received != payload:
+                errors += 1
+
+        except (OSError, socket.timeout):
+            errors += 1
+            sock.close()
+            time.sleep(0.5)
+            try:
+                sock = connect(ip, port, baud)
+                sock.settimeout(pkt_timeout)
+                reconnects += 1
+            except OSError as e:
+                print(f"\n  [!] Reconnect failed: {e}")
+                break
+
+        now = time.monotonic()
+        if now >= t_report:
+            elapsed = now - t_start
+            kbps = (total_sent * 8) / elapsed / 1000
+            print(f"  {elapsed:>7.1f}s  {total_pkts:>8}  {errors:>6}  {total_sent/1024:>7.1f}K  {kbps:>7.1f}")
+            t_report = now + 5.0
+
+    sock.close()
+    elapsed = time.monotonic() - t_start
+    kbps    = (total_sent * 8) / elapsed / 1000 if elapsed > 0 else 0
+
+    print(f"\n{'─'*60}")
+    print(f"Stress test complete")
+    print(f"  Duration   : {elapsed:.1f} s")
+    print(f"  Packets    : {total_pkts}")
+    print(f"  Bytes sent : {total_sent:,}")
+    print(f"  Bytes recv : {total_recv:,}")
+    print(f"  Errors     : {errors}")
+    print(f"  Reconnects : {reconnects}")
+    print(f"  Throughput : {kbps:.1f} kbps")
+    if errors == 0:
+        print(f"\n  PASS — no errors in {elapsed:.0f} s")
+    else:
+        error_rate = errors / total_pkts * 100 if total_pkts else 0
+        print(f"\n  FAIL — {errors} errors ({error_rate:.2f}%)")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="UART bridge client for wireless-esp8266-dap")
@@ -237,6 +339,10 @@ def main():
                         help="Run TX→RX loopback test (GPIO20 shorted to GPIO21)")
     parser.add_argument("--all-bauds", action="store_true",
                         help="Sweep all supported baud rates in loopback test")
+    parser.add_argument("--stress", action="store_true",
+                        help="Run continuous loopback stress test")
+    parser.add_argument("--duration", type=int, default=600,
+                        help="Stress test duration in seconds (default: 600 = 10 min)")
     parser.add_argument("--send", default=None,
                         help="Send this string then print received bytes (non-interactive)")
     parser.add_argument("--timeout", type=float, default=1.0,
@@ -245,7 +351,9 @@ def main():
                         help="Append all received text to this file")
     args = parser.parse_args()
 
-    if args.loopback:
+    if args.stress:
+        stress_test(args.ip, args.port, args.baud, args.duration)
+    elif args.loopback:
         loopback_test(args.ip, args.port, args.baud, args.all_bauds)
     elif args.send is not None:
         response = send_and_receive(args.ip, args.port, args.baud,

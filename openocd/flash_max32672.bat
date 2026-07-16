@@ -39,7 +39,7 @@ echo.
   -c "cmsis-dap elaphurelink addr %DAP_HOST%" ^
   -c "adapter speed 1000" ^
   -c "reset_config srst_only" ^
-  -c "swd newdap max32672.cpu -irlen 4 -expected-id 0x2ba01477 -ignore-version" ^
+  -c "swd newdap max32672 cpu -irlen 4 -irmask 0xf -expected-id 0x2ba01477 -ignore-version" ^
   -c "dap create max32672.dap -chain-position max32672.cpu" ^
   -c "target create max32672.cpu cortex_m -dap max32672.dap" ^
   -c "max32672.cpu configure -work-area-phys 0x20000000 -work-area-size 0x8000 -work-area-backup 0" ^

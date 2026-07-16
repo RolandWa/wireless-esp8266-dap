@@ -42,6 +42,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "driver/uart.h"
+#include "driver/gpio.h"
 
 #include "lwip/err.h"
 #include "lwip/sockets.h"
@@ -185,13 +186,23 @@ static void close_tcp_netconn(struct netconn *nc) {
     netconn_delete(nc);
 }
 
-static void uart_bridge_setup() {
+/* Set TX/RX pins to input (high-Z) so they do not drive the target. */
+static void uart_pins_highz() {
+#if defined CONFIG_IDF_TARGET_ESP32 || defined CONFIG_IDF_TARGET_ESP32C3 || defined CONFIG_IDF_TARGET_ESP32S3
+    gpio_set_direction(UART_BRIDGE_TX_PIN, GPIO_MODE_INPUT);
+    gpio_set_direction(UART_BRIDGE_RX_PIN, GPIO_MODE_INPUT);
+#endif
+}
+
+/* Install UART driver and switch pins to active UART function. */
+static void uart_enable() {
     uart_config_t uart_config = {
         .baud_rate = UART_BRIDGE_BAUDRATE,
         .data_bits = UART_DATA_8_BITS,
-        .parity = UART_PARITY_DISABLE,
+        .parity    = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE};
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+    };
 
     if (UART_BRIDGE_TX == UART_BRIDGE_RX) {
         uart_param_config(UART_BRIDGE_RX, &uart_config);
@@ -199,15 +210,26 @@ static void uart_bridge_setup() {
     } else {
         uart_param_config(UART_BRIDGE_RX, &uart_config);
         uart_param_config(UART_BRIDGE_TX, &uart_config);
-
-        uart_driver_install(UART_BRIDGE_RX, UART_BUF_SIZE, 0, 0, NULL, 0); // RX only
-        uart_driver_install(UART_BRIDGE_TX, 0, UART_BUF_SIZE, 0, NULL, 0); // TX only
+        uart_driver_install(UART_BRIDGE_RX, UART_BUF_SIZE, 0, 0, NULL, 0);
+        uart_driver_install(UART_BRIDGE_TX, 0, UART_BUF_SIZE, 0, NULL, 0);
     }
 
-#if defined CONFIG_IDF_TARGET_ESP32 || defined CONFIG_IDF_TARGET_ESP32C3
+#if defined CONFIG_IDF_TARGET_ESP32 || defined CONFIG_IDF_TARGET_ESP32C3 || defined CONFIG_IDF_TARGET_ESP32S3
     uart_set_pin(UART_BRIDGE_TX, UART_BRIDGE_TX_PIN, UART_BRIDGE_RX_PIN, -1, -1);
 #endif
+    ESP_LOGI(UART_TAG, "UART enabled — pins active");
+}
 
+/* Delete UART driver and return pins to high-Z inputs. */
+static void uart_disable() {
+    if (UART_BRIDGE_TX == UART_BRIDGE_RX) {
+        uart_driver_delete(UART_BRIDGE_RX);
+    } else {
+        uart_driver_delete(UART_BRIDGE_RX);
+        uart_driver_delete(UART_BRIDGE_TX);
+    }
+    uart_pins_highz();
+    ESP_LOGI(UART_TAG, "UART disabled — pins high-Z");
 }
 
 void uart_bridge_init() {
@@ -215,7 +237,7 @@ void uart_bridge_init() {
 }
 
 void uart_bridge_task() {
-    uart_bridge_setup();
+    uart_pins_highz();  // boot state: pins are inputs, UART driver not installed
     uart_server_events = xQueueCreate(EVENTS_QUEUE_SIZE, sizeof(netconn_events));
 
     struct netconn *nc = NULL; // To create servers
@@ -247,6 +269,7 @@ void uart_bridge_task() {
             if (is_conn_valid) {
                 close_tcp_netconn(uart_netconn);
                 uart_bridge_reset();
+                uart_disable();
             }
         } else if (events.nc->state == NETCONN_LISTEN) {
             if (is_conn_valid) {
@@ -270,6 +293,7 @@ void uart_bridge_task() {
             uart_netconn = nc_in;
             is_conn_valid = true;
             is_first_time_recv = true;
+            uart_enable();
         } else if (events.nc->state != NETCONN_LISTEN) {
             // if (events.nc && events.nc->pcb.tcp)
             //     tcp_nagle_disable(events.nc->pcb.tcp);
@@ -312,6 +336,7 @@ void uart_bridge_task() {
                 if (is_conn_valid) {
                     close_tcp_netconn(events.nc);
                     uart_bridge_reset();
+                    uart_disable();
                 }
             }
         }
