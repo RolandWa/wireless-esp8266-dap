@@ -238,6 +238,51 @@ The XIAO board has a Schottky diode on the USB input (≈ 0.5–0.7 V drop), lea
 
 ---
 
+## 10. VTarget Output Waveform Measurement
+
+**Script:** `tests/measure_vtarget_vb.py`
+**Instrument:** NI VB-8034 mixed-signal oscilloscope, Channel 1 (`mso/1`)
+**Acquisition:** Internal `niVB_MSO_ReadAnalog()` API, 5 MS/s, 2 ms window
+**Sweep:** 101 points from 0% to 100% PWM duty in 1% increments
+**Test date:** 2026-08-25
+
+The script measures the VTarget output waveform directly on Channel 1 and
+calculates average voltage, RMS voltage, and peak-to-peak voltage from the
+acquired samples. The corresponding DAP Vendor2 command is sent before each
+measurement, and VTarget is restored to 3300 mV after the sweep.
+
+### 10.1 Representative Results
+
+| PWM duty | Command (mV) | Average (V) | RMS (V) | Peak-to-peak (V) |
+|---:|---:|---:|---:|---:|
+| 0% | 5000 | 4.194 | 4.194 | 0.123 |
+| 25% | 4062 | 4.115 | 4.116 | 0.453 |
+| 50% | 3123 | 3.973 | 3.980 | 0.741 |
+| 75% | 2188 | 3.772 | 3.783 | 0.947 |
+| 78% | 2075 | 3.734 | 3.745 | 1.152 |
+| 98% | 1323 | 1.272 | 1.273 | 0.165 |
+| 100% | 1250 | 1.274 | 1.275 | 0.370 |
+
+### 10.2 Summary
+
+| Parameter | Result |
+| --- | --- |
+| Average VTarget range | **1.272-4.194 V** |
+| RMS VTarget range | **1.273-4.194 V** |
+| Maximum peak-to-peak ripple | **1.152 V at 78% duty** |
+| Samples per waveform | **10,137** |
+| PWM frequency | **1 kHz** |
+| Sweep result | **101/101 measurements acquired** |
+
+The VTarget voltage decreases as PWM duty increases, but the output contains
+substantial PWM ripple through much of the range. RMS is close to the average
+voltage at low ripple and diverges as ripple increases. The output should be
+filtered and regulated before use as a target supply.
+
+**Output files:**
+- [`vtarget_pwm_vb_measurements.csv`](test_results/vtarget_pwm_vb_measurements.csv) - all 101 waveform measurements
+- [`vtarget_pwm_vb_curve.png`](test_results/vtarget_pwm_vb_curve.png) - average, RMS, and peak-to-peak curves
+
 ## TODO
 
 - [x] **UART pins high-Z by default — activate only on TCP client connect** — implemented in `uart_bridge.c`: `uart_pins_highz()` called at task start (boot state); `uart_enable()` called on TCP `accept()` (installs driver, activates pins); `uart_disable()` called on TCP disconnect and WiFi disconnect (deletes driver, returns pins to `GPIO_MODE_INPUT`). Safe to connect to targets that hard-wire programmer TX to GND.

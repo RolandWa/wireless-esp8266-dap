@@ -13,6 +13,7 @@ Usage:
 """
 
 import argparse
+from pathlib import Path
 import socket
 import struct
 import sys
@@ -34,8 +35,25 @@ RESPONSE_CMD      = 0x00000003
 URB_FMT           = "!IIIIIIIIII8s"
 DIR_OUT, DIR_IN   = 0, 1
 
-# Voltage sweep: 1.25 V to 5.0 V in steps; always include key embedded voltages
-SWEEP_VOLTAGES_MV = [1250, 1800, 2500, 3000, 3300, 3600, 4096, 5000]
+# Voltage sweep: exactly 100 points from 1.25 V to 5.0 V, including key voltages.
+_KEY_VOLTAGES_MV = (1250, 1800, 2500, 3000, 3300, 3600, 4096, 5000)
+_SWEEP_POINTS = 100
+_SWEEP_VOLTAGES_MV = [
+    round(1250 + index * (5000 - 1250) / (_SWEEP_POINTS - 1))
+    for index in range(_SWEEP_POINTS)
+]
+
+# Replace the nearest generated points with the key voltages while retaining
+# exactly 100 unique setpoints across the supported range.
+_used_indices = set()
+for key_voltage in _KEY_VOLTAGES_MV:
+    index = min(
+        (candidate for candidate in range(_SWEEP_POINTS) if candidate not in _used_indices),
+        key=lambda candidate: abs(_SWEEP_VOLTAGES_MV[candidate] - key_voltage),
+    )
+    _SWEEP_VOLTAGES_MV[index] = key_voltage
+    _used_indices.add(index)
+SWEEP_VOLTAGES_MV = sorted(set(_SWEEP_VOLTAGES_MV))
 
 PASS_THRESHOLD_PCT = 5.0   # acceptable error vs set-point
 
@@ -115,6 +133,36 @@ def read_vtarget(sock, seqnum, samples=5):
     return avg, seqnum
 
 
+def plot_results(results):
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        print("  Plot skipped: matplotlib is not installed")
+        return
+
+    duty_percent = [100 * (5000 - result[0]) / (5000 - 1250) for result in results]
+    measured_mv = [result[1] for result in results]
+    setpoint_mv = [result[0] for result in results]
+
+    output_dir = Path(__file__).resolve().parent / "test_results"
+    output_dir.mkdir(exist_ok=True)
+    output_path = output_dir / "vtarget_pwm_curve.png"
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(duty_percent, measured_mv, "o-", markersize=3, label="Measured VTarget")
+    plt.plot(duty_percent, setpoint_mv, "--", label="Requested VTarget")
+    plt.xlabel("PWM duty cycle (%)")
+    plt.ylabel("VTarget voltage (mV)")
+    plt.title("VTarget Voltage vs PWM Duty Cycle")
+    plt.xlim(0, 100)
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+    print(f"  Graph saved to: {output_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="VTarget PWM sweep test")
     parser.add_argument("--ip",     default=DEFAULT_IP)
@@ -165,6 +213,8 @@ def main():
         # Return to 3.3 V default
         set_vtarget(sock, seqnum, 3300)
         print(f"  PWM restored to 3300 mV default")
+
+        plot_results(results)
 
     print()
     if passed_all:

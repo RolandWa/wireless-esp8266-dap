@@ -410,6 +410,31 @@ DAP Accuracy (vs DMM Reference):
 Test complete!
 ```
 
+### VTarget Waveform Measurement with VirtualBench
+
+Use `measure_vtarget_vb.py` to measure the VTarget output directly with a
+VirtualBench oscilloscope. Connect VTarget to Channel 1 (`mso/1`) and use the
+configured probe attenuation. The script sweeps PWM from 0% to 100% in 1%
+increments and uses the internal `niVB_MSO_ReadAnalog()` API to calculate
+average voltage, RMS voltage, and peak-to-peak ripple.
+
+```bash
+# Run the default 101-point sweep
+python measure_vtarget_vb.py
+
+# Faster 5% sweep with a longer settling time
+python measure_vtarget_vb.py --step 5 --settle 0.5
+
+# Specify the DAP, VirtualBench, and probe settings
+python measure_vtarget_vb.py --ip 192.168.137.123 --vb VB8034-314E194 --probe 10
+```
+
+The script restores VTarget to 3300 mV after the sweep and writes these files
+to `test_results/`:
+
+- `vtarget_pwm_vb_measurements.csv` - measurement data for every duty point
+- `vtarget_pwm_vb_curve.png` - average, RMS, and peak-to-peak plots
+
 **Output Files** (in `test_results/` directory):
 - `vtarget_linearity_YYYYMMDD_HHMMSS.csv` - Statistical summary (DAP and DMM columns)
 - `vtarget_linearity_YYYYMMDD_HHMMSS_raw.csv` - All raw measurements (DAP and DMM samples)

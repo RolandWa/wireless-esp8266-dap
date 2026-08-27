@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 PWM sweep with simultaneous DAP ADC + VB-8034 DMM voltage measurement.
-Sweeps GPIO3 PWM from 0% to 100%, reads VTarget via Vendor1 and DMM.
+Sweeps GPIO3 PWM from 0% to 100% in 1% increments, reads VTarget via
+Vendor1 and the VirtualBench DMM.
 
 Usage:
     python tests/pwm_vtarget_dmm.py [--ip 192.168.137.123] [--vb VB8034-314E194]
@@ -12,6 +13,7 @@ import socket
 import struct
 import sys
 import time
+from pathlib import Path
 
 import pyvirtualbench as pvb
 
@@ -92,6 +94,36 @@ def dap_read_vtarget(sock, seq):
     return mv, seq + 2
 
 
+def save_plot(results):
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        print("  Plot skipped: matplotlib is not installed")
+        return
+
+    output_dir = Path(__file__).resolve().parent / "test_results"
+    output_dir.mkdir(exist_ok=True)
+    output_path = output_dir / "vtarget_pwm_dmm_curve.png"
+
+    duty_percent = [result[0] for result in results]
+    adc_voltage = [result[2] / 1000 for result in results]
+    dmm_voltage = [result[3] / 1000 for result in results]
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(duty_percent, dmm_voltage, "o-", markersize=3, label="VirtualBench DMM")
+    plt.plot(duty_percent, adc_voltage, "o-", markersize=3, label="DAP ADC")
+    plt.xlabel("PWM duty cycle (%)")
+    plt.ylabel("VTarget voltage (V)")
+    plt.title("VTarget Voltage vs PWM Duty Cycle")
+    plt.xlim(0, 100)
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+    print(f"  Graph saved to: {output_path}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ip",    default=DEFAULT_IP)
@@ -100,13 +132,14 @@ def main():
                     help="Settle time after PWM change (s)")
     args = ap.parse_args()
 
-    steps = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    steps = list(range(0, 101))
 
-    print(f"PWM sweep + simultaneous DAP ADC & DMM measurement")
+    print("PWM sweep + simultaneous DAP ADC & DMM measurement")
     print(f"  Device      : {args.ip}:{USBIP_PORT}")
     print(f"  VirtualBench: {args.vb}")
     print(f"  Wiring      : VTarget output shorted to VTref (GPIO2 ADC)")
     print(f"  DMM probes  : V terminal on VTarget pad, COM on GND")
+    print("  Sweep       : 0% to 100% PWM duty in 1% increments")
     print()
 
     vb_dev = pvb.PyVirtualBench(args.vb)
@@ -163,6 +196,7 @@ def main():
             print("  NOTE: VTarget not responding to PWM - LDO fixed output or dropout")
         else:
             print("  PWM voltage control is working!")
+        save_plot(results)
     return 0
 
 
