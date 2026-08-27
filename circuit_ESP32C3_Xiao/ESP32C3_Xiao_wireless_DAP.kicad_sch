@@ -3909,6 +3909,26 @@
 		)
 		(uuid "0c42b6f9-d7c1-43e5-84bd-c0ecc8c8fa90")
 	)
+	(text "R4 - 40k || 39k\nR5 - 43k"
+		(exclude_from_sim no)
+		(at 102.235 189.23 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "15899cc9-4cf0-4788-833f-f19e1564c798")
+	)
+	(text "AO3400A"
+		(exclude_from_sim no)
+		(at 118.11 184.912 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "2e170d70-74da-420f-9198-2b89f97e40ef")
+	)
 	(text ".param pulse_width = 0.1\n.param period = 20u\n; .dc pulse_width 0.1 0.9 0.1\n.OPTIONS METHOD=GEAR\n.OPTIONS RELTOL=0.01\n.OPTIONS VNTOL=10uV"
 		(exclude_from_sim no)
 		(at 59.69 190.5 0)
@@ -5874,6 +5894,16 @@
 		)
 		(uuid "87546d02-ddcb-4c31-953f-d2d8d606632a")
 	)
+	(label "Vadj"
+		(at 119.38 142.24 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "8965ad2c-78e5-4a7e-926f-fc2b27413c0a")
+	)
 	(label "TDI"
 		(at 196.85 45.72 180)
 		(effects
@@ -6276,7 +6306,7 @@
 				)
 			)
 		)
-		(property "Value" "39k"
+		(property "Value" "22k"
 			(at 73.66 166.37 90)
 			(effects
 				(font
@@ -6528,7 +6558,7 @@
 			(uuid "59216a4c-5366-4ba2-8232-0b31817d61f4")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "U2")
 					(unit 1)
@@ -6767,7 +6797,7 @@
 			(uuid "f4c9cf0e-9aae-45dd-ba56-58f32633c910")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "#PWR03")
 					(unit 1)
@@ -6907,7 +6937,7 @@
 			)
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "H1")
 					(unit 1)
@@ -7109,7 +7139,7 @@
 			(uuid "b5301f24-ff17-4e3f-99a2-db66e88ca967")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "V1")
 					(unit 1)
@@ -7273,7 +7303,7 @@
 			(uuid "9062f901-efe2-409e-b700-4d1bf7600180")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "J6")
 					(unit 1)
@@ -7643,7 +7673,7 @@
 			(uuid "c4a73897-a5bd-4e53-a0a6-d6f07f0f67fd")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "J1")
 					(unit 1)
@@ -7758,7 +7788,7 @@
 			(uuid "0cfaf40e-0eb0-443e-b207-40cb8a7b3547")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "V3")
 					(unit 1)
@@ -8132,7 +8162,7 @@
 			(uuid "60e28b0f-1c36-431f-9006-d2dba5d3a43f")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "#PWR01")
 					(unit 1)
@@ -8239,7 +8269,7 @@
 			(uuid "4a11571d-d1f6-42bb-8226-016b727e7260")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "V2")
 					(unit 1)
@@ -8557,7 +8587,7 @@
 			(uuid "f6d69cb0-5a00-4140-a8b7-e353eb9e7200")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "U1")
 					(unit 1)
@@ -8690,7 +8720,7 @@
 			(uuid "9215e724-6c8d-4100-8512-118f0c04f16f")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "#PWR05")
 					(unit 1)
@@ -8830,7 +8860,7 @@
 			(uuid "d9d66cb1-e372-4669-806b-71dfd3968cce")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "J2")
 					(unit 1)
@@ -8959,7 +8989,7 @@
 			(uuid "352903a5-8ab2-461a-b993-84ffd8cf74b5")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "Q1")
 					(unit 1)
@@ -9166,7 +9196,7 @@
 			(uuid "9a6fb465-a950-49d8-bc99-e72e48b750f2")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "D4")
 					(unit 1)
@@ -9193,7 +9223,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "10k"
+		(property "Value" "43k"
 			(at 97.79 176.5299 0)
 			(effects
 				(font
@@ -9752,7 +9782,7 @@
 			(uuid "4b44af0f-dcaf-449d-a823-9240ce64cb9b")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "C1")
 					(unit 1)
@@ -10001,7 +10031,7 @@
 			(uuid "fb7aa8f3-fad0-4165-8204-992d66cdfba2")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "D1")
 					(unit 1)
@@ -10485,7 +10515,7 @@
 			(uuid "b6cb7005-e247-4507-b9c6-1052bef8a1c0")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "J4")
 					(unit 1)
@@ -10512,7 +10542,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10nF"
+		(property "Value" "10uF /16V"
 			(at 107.95 176.5299 0)
 			(effects
 				(font
@@ -10987,7 +11017,7 @@
 			(uuid "b35bc328-3d6a-41dd-aafc-cd6b7b36b7ae")
 		)
 		(instances
-			(project ""
+			(project "ESP32C3_Xiao_wireless_DAP"
 				(path "/ef31936a-2a92-40a9-b57a-332afb0572a5"
 					(reference "R1")
 					(unit 1)

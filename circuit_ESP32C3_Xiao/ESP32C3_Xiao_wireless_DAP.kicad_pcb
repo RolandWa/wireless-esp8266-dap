@@ -164,7 +164,7 @@
 	(net 29 "unconnected-(U1-CHIP_EN-Pad19)")
 	(net 30 "unconnected-(U1-MTCK-Pad22)")
 	(net 31 "/TDI")
-	(net 32 "Net-(U2-ADJ)")
+	(net 32 "/Vadj")
 	(net 33 "Net-(D1-K)")
 	(net 34 "Net-(D2-K)")
 	(net 35 "/nTRST")
@@ -1451,7 +1451,7 @@
 			(size 1.075 0.95)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(roundrect_rratio 0.25)
-			(net 32 "Net-(U2-ADJ)")
+			(net 32 "/Vadj")
 			(pintype "passive")
 			(uuid "5aaa71d3-dcef-4de4-857f-ab50ccacfa9d")
 		)
@@ -2542,7 +2542,7 @@
 				)
 			)
 		)
-		(property "Value" "10nF"
+		(property "Value" "10uF /16V"
 			(at 0 1.43 270)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -2770,7 +2770,7 @@
 				)
 			)
 		)
-		(property "Value" "39k"
+		(property "Value" "22k"
 			(at 0 1.43 0)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -4114,7 +4114,7 @@
 				)
 			)
 		)
-		(property "Value" "10k"
+		(property "Value" "43k"
 			(at 0 1.43 90)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -6465,7 +6465,7 @@
 			(size 0.975 0.95)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(roundrect_rratio 0.25)
-			(net 32 "Net-(U2-ADJ)")
+			(net 32 "/Vadj")
 			(pintype "passive")
 			(uuid "fb756595-f90b-4848-bead-b036e820ec2e")
 		)
@@ -7733,7 +7733,7 @@
 			(size 0.975 0.95)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(roundrect_rratio 0.25)
-			(net 32 "Net-(U2-ADJ)")
+			(net 32 "/Vadj")
 			(pintype "passive")
 			(uuid "c48a57f6-f0f1-4b6c-a572-e6288590bf11")
 		)
@@ -10418,7 +10418,7 @@
 			(size 2 1.5)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(roundrect_rratio 0.25)
-			(net 32 "Net-(U2-ADJ)")
+			(net 32 "/Vadj")
 			(pinfunction "ADJ")
 			(pintype "input")
 			(uuid "e6ac40a5-8013-416a-b355-dc37e90cd39c")
@@ -10668,7 +10668,7 @@
 			(size 0.975 0.95)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(roundrect_rratio 0.25)
-			(net 32 "Net-(U2-ADJ)")
+			(net 32 "/Vadj")
 			(pintype "passive")
 			(uuid "dab3f828-9cba-467a-91c0-723304e4f767")
 		)
@@ -12466,6 +12466,16 @@
 	)
 	(gr_line
 		(start 111.2784 70.3032)
+		(end 111.2784 84.3032)
+		(stroke
+			(width 0.15)
+			(type solid)
+		)
+		(layer "Cmts.User")
+		(uuid "b4719fe6-06b8-4b1d-94b8-febb14486e94")
+	)
+	(gr_line
+		(start 111.2784 70.3032)
 		(end 145.2784 70.3032)
 		(stroke
 			(width 0.15)
@@ -12473,16 +12483,6 @@
 		)
 		(layer "Cmts.User")
 		(uuid "36993c43-60d2-4845-b97d-22f78d42c3f5")
-	)
-	(gr_line
-		(start 134.3672 84.3032)
-		(end 134.3672 58.6032)
-		(stroke
-			(width 0.15)
-			(type default)
-		)
-		(layer "Cmts.User")
-		(uuid "40a33dba-7dc2-4f4d-a987-f23d66c6af46")
 	)
 	(gr_line
 		(start 111.2784 98.3032)
@@ -12495,16 +12495,6 @@
 		(uuid "619b9e86-7e2f-4334-885a-a5dfa2d44e43")
 	)
 	(gr_line
-		(start 145.2784 70.3032)
-		(end 145.2784 98.3532)
-		(stroke
-			(width 0.15)
-			(type default)
-		)
-		(layer "Cmts.User")
-		(uuid "84a3bbb8-4129-4214-9a36-403f0e39d4d7")
-	)
-	(gr_line
 		(start 111.2784 98.3032)
 		(end 145.2672 98.3032)
 		(stroke
@@ -12513,46 +12503,6 @@
 		)
 		(layer "Cmts.User")
 		(uuid "8773e067-4bd3-43ff-8a98-b932081b238e")
-	)
-	(gr_line
-		(start 169.3672 101.8032)
-		(end 99.3672 66.8032)
-		(stroke
-			(width 0.15)
-			(type default)
-		)
-		(layer "Cmts.User")
-		(uuid "a8c14268-03c9-4b94-b9ed-9492b4b7bfda")
-	)
-	(gr_line
-		(start 169.3672 66.8032)
-		(end 99.3672 101.8032)
-		(stroke
-			(width 0.15)
-			(type default)
-		)
-		(layer "Cmts.User")
-		(uuid "ae34504a-2c5c-4515-adcd-fec780003a64")
-	)
-	(gr_line
-		(start 134.3672 84.3032)
-		(end 134.3672 116.6032)
-		(stroke
-			(width 0.15)
-			(type default)
-		)
-		(layer "Cmts.User")
-		(uuid "af4fd8e6-4a7f-46c5-a266-1680aef16688")
-	)
-	(gr_line
-		(start 111.2784 70.3032)
-		(end 111.2784 84.3032)
-		(stroke
-			(width 0.15)
-			(type solid)
-		)
-		(layer "Cmts.User")
-		(uuid "b4719fe6-06b8-4b1d-94b8-febb14486e94")
 	)
 	(gr_line
 		(start 134.3672 84.3032)
@@ -12566,6 +12516,26 @@
 	)
 	(gr_line
 		(start 134.3672 84.3032)
+		(end 134.3672 58.6032)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "Cmts.User")
+		(uuid "40a33dba-7dc2-4f4d-a987-f23d66c6af46")
+	)
+	(gr_line
+		(start 134.3672 84.3032)
+		(end 134.3672 116.6032)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "Cmts.User")
+		(uuid "af4fd8e6-4a7f-46c5-a266-1680aef16688")
+	)
+	(gr_line
+		(start 134.3672 84.3032)
 		(end 187.7672 84.3032)
 		(stroke
 			(width 0.15)
@@ -12573,6 +12543,36 @@
 		)
 		(layer "Cmts.User")
 		(uuid "e3b68129-8636-483d-a2c0-e21c70fae28b")
+	)
+	(gr_line
+		(start 145.2784 70.3032)
+		(end 145.2784 98.3532)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "Cmts.User")
+		(uuid "84a3bbb8-4129-4214-9a36-403f0e39d4d7")
+	)
+	(gr_line
+		(start 169.3672 66.8032)
+		(end 99.3672 101.8032)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "Cmts.User")
+		(uuid "ae34504a-2c5c-4515-adcd-fec780003a64")
+	)
+	(gr_line
+		(start 169.3672 101.8032)
+		(end 99.3672 66.8032)
+		(stroke
+			(width 0.15)
+			(type default)
+		)
+		(layer "Cmts.User")
+		(uuid "a8c14268-03c9-4b94-b9ed-9492b4b7bfda")
 	)
 	(gr_rect
 		(start 99.3672 66.8032)
@@ -12586,22 +12586,36 @@
 		(layer "Edge.Cuts")
 		(uuid "ac8bea66-c947-4d83-be41-536ac456fa6a")
 	)
-	(gr_text "VTarget"
-		(at 137.9172 79.3532 0)
+	(gr_text "Vref"
+		(at 145.2172 89.8532 0)
 		(layer "F.SilkS")
-		(uuid "1332fa92-9efa-4f9d-b3c2-cdc70a7bb2e5")
+		(uuid "979f92cb-7ffc-4b7d-a457-5a63e75c65e4")
 		(effects
 			(font
-				(size 1.2 1.2)
-				(thickness 0.2)
+				(size 0.8 0.8)
+				(thickness 0.15)
+				(bold yes)
 			)
 			(justify left bottom)
 		)
 	)
-	(gr_text "VTarget"
-		(at 145.2172 95.8532 0)
+	(gr_text "GND"
+		(at 145.2172 91.3532 0)
 		(layer "F.SilkS")
-		(uuid "1bd96a72-f433-49de-94fb-8edb6b3215ff")
+		(uuid "ae3ad455-3fa1-4c00-9c37-8c368bf4d42c")
+		(effects
+			(font
+				(size 0.8 0.8)
+				(thickness 0.15)
+				(bold yes)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "TX"
+		(at 145.2172 92.8532 0)
+		(layer "F.SilkS")
+		(uuid "56b8c78c-8445-4bed-abd4-3e52b23fac1b")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -12624,10 +12638,62 @@
 			(justify left bottom)
 		)
 	)
+	(gr_text "VTarget"
+		(at 145.2172 95.8532 0)
+		(layer "F.SilkS")
+		(uuid "1bd96a72-f433-49de-94fb-8edb6b3215ff")
+		(effects
+			(font
+				(size 0.8 0.8)
+				(thickness 0.15)
+				(bold yes)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "TMS"
+		(at 160.6672 92.8032 0)
+		(layer "F.SilkS")
+		(uuid "76616d58-69b1-4b8e-91bb-a2e4916650fd")
+		(effects
+			(font
+				(size 0.8 0.8)
+				(thickness 0.15)
+				(bold yes)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "TCK"
+		(at 160.6672 94.3032 0)
+		(layer "F.SilkS")
+		(uuid "80519acf-45c6-4120-afbd-5ff59ccd7c38")
+		(effects
+			(font
+				(size 0.8 0.8)
+				(thickness 0.15)
+				(bold yes)
+			)
+			(justify left bottom)
+		)
+	)
 	(gr_text "TDO"
 		(at 160.6672 95.8032 0)
 		(layer "F.SilkS")
 		(uuid "30a8c90e-c3e2-4e9d-bc51-68a04380fa71")
+		(effects
+			(font
+				(size 0.8 0.8)
+				(thickness 0.15)
+				(bold yes)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "TDI"
+		(at 160.6672 97.3032 0)
+		(layer "F.SilkS")
+		(uuid "a58c16e6-bd8e-4077-a199-14e1220e473b")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -12662,28 +12728,14 @@
 			(justify left bottom)
 		)
 	)
-	(gr_text "TX"
-		(at 132.1172 91.6532 0)
+	(gr_text "VTarget"
+		(at 137.9172 79.3532 0)
 		(layer "F.SilkS")
-		(uuid "4badf00f-e079-4a9a-a14d-9160a2825188")
+		(uuid "1332fa92-9efa-4f9d-b3c2-cdc70a7bb2e5")
 		(effects
 			(font
-				(size 2 1.4)
-				(thickness 0.3)
-				(bold yes)
-			)
-			(justify left bottom)
-		)
-	)
-	(gr_text "TX"
-		(at 145.2172 92.8532 0)
-		(layer "F.SilkS")
-		(uuid "56b8c78c-8445-4bed-abd4-3e52b23fac1b")
-		(effects
-			(font
-				(size 0.8 0.8)
-				(thickness 0.15)
-				(bold yes)
+				(size 1.2 1.2)
+				(thickness 0.2)
 			)
 			(justify left bottom)
 		)
@@ -12701,66 +12753,14 @@
 			(justify left bottom)
 		)
 	)
-	(gr_text "TMS"
-		(at 160.6672 92.8032 0)
+	(gr_text "TX"
+		(at 132.1172 91.6532 0)
 		(layer "F.SilkS")
-		(uuid "76616d58-69b1-4b8e-91bb-a2e4916650fd")
+		(uuid "4badf00f-e079-4a9a-a14d-9160a2825188")
 		(effects
 			(font
-				(size 0.8 0.8)
-				(thickness 0.15)
-				(bold yes)
-			)
-			(justify left bottom)
-		)
-	)
-	(gr_text "TCK"
-		(at 160.6672 94.3032 0)
-		(layer "F.SilkS")
-		(uuid "80519acf-45c6-4120-afbd-5ff59ccd7c38")
-		(effects
-			(font
-				(size 0.8 0.8)
-				(thickness 0.15)
-				(bold yes)
-			)
-			(justify left bottom)
-		)
-	)
-	(gr_text "Vref"
-		(at 145.2172 89.8532 0)
-		(layer "F.SilkS")
-		(uuid "979f92cb-7ffc-4b7d-a457-5a63e75c65e4")
-		(effects
-			(font
-				(size 0.8 0.8)
-				(thickness 0.15)
-				(bold yes)
-			)
-			(justify left bottom)
-		)
-	)
-	(gr_text "TDI"
-		(at 160.6672 97.3032 0)
-		(layer "F.SilkS")
-		(uuid "a58c16e6-bd8e-4077-a199-14e1220e473b")
-		(effects
-			(font
-				(size 0.8 0.8)
-				(thickness 0.15)
-				(bold yes)
-			)
-			(justify left bottom)
-		)
-	)
-	(gr_text "GND"
-		(at 145.2172 91.3532 0)
-		(layer "F.SilkS")
-		(uuid "ae3ad455-3fa1-4c00-9c37-8c368bf4d42c")
-		(effects
-			(font
-				(size 0.8 0.8)
-				(thickness 0.15)
+				(size 2 1.4)
+				(thickness 0.3)
 				(bold yes)
 			)
 			(justify left bottom)
@@ -12779,10 +12779,10 @@
 			(justify left bottom)
 		)
 	)
-	(gr_text "Pin 7: UART_RX  Pin 8: TDI"
-		(at 135.2172 78.7532 0)
+	(gr_text "13:TDO 14:GND 15:nRST 16:GND 17:RX 18:GND"
+		(at 112.800533 85.5032 0)
 		(layer "B.SilkS")
-		(uuid "16c83023-ace0-4d30-89d1-a9af47fa3a14")
+		(uuid "9465e492-94e8-4248-b120-b19448a49d88")
 		(effects
 			(font
 				(size 0.7 0.7)
@@ -12791,10 +12791,10 @@
 			(justify mirror)
 		)
 	)
-	(gr_text "Pin 3: GND      Pin 4: TCK/SWCLK"
-		(at 133.050533 76.1532 0)
+	(gr_text "1:VTref 2:VTref 3:nTRST 4:GND 5:TDI 6:GND"
+		(at 113.917201 82.9032 0)
 		(layer "B.SilkS")
-		(uuid "21fa80e0-1b49-4502-a45b-daf047e2a2af")
+		(uuid "f1951699-633c-4e96-9271-df49c5279455")
 		(effects
 			(font
 				(size 0.7 0.7)
@@ -12815,44 +12815,6 @@
 			(justify mirror)
 		)
 	)
-	(gr_text "Pin 5: UART_TX  Pin 6: TDO/SWO"
-		(at 133.633867 77.4532 0)
-		(layer "B.SilkS")
-		(uuid "2ba694db-6224-4ee1-8d11-541be93d38c4")
-		(effects
-			(font
-				(size 0.7 0.7)
-				(thickness 0.12)
-			)
-			(justify mirror)
-		)
-	)
-	(gr_text "10-PIN CORTEX DEBUG (J1/J3)"
-		(at 127.801959 72.8532 0)
-		(layer "B.SilkS")
-		(uuid "444b00e3-277a-477b-93a5-a51e6a26d755")
-		(effects
-			(font
-				(size 1.2 1.2)
-				(thickness 0.2)
-				(bold yes)
-			)
-			(justify mirror)
-		)
-	)
-	(gr_text "20-PIN ARM JTAG (J2)"
-		(at 114.768627 80.9032 0)
-		(layer "B.SilkS")
-		(uuid "46306089-c8f2-4d71-aa1e-46c5fbf77db7")
-		(effects
-			(font
-				(size 1.2 1.2)
-				(thickness 0.2)
-				(bold yes)
-			)
-			(justify mirror)
-		)
-	)
 	(gr_text "19:VTarget 20:VTref (TX:11 RX:17)"
 		(at 116.183866 86.8032 0)
 		(layer "B.SilkS")
@@ -12865,10 +12827,10 @@
 			(justify mirror)
 		)
 	)
-	(gr_text "13:TDO 14:GND 15:nRST 16:GND 17:RX 18:GND"
-		(at 112.800533 85.5032 0)
+	(gr_text "Pin 3: GND      Pin 4: TCK/SWCLK"
+		(at 133.050533 76.1532 0)
 		(layer "B.SilkS")
-		(uuid "9465e492-94e8-4248-b120-b19448a49d88")
+		(uuid "21fa80e0-1b49-4502-a45b-daf047e2a2af")
 		(effects
 			(font
 				(size 0.7 0.7)
@@ -12889,6 +12851,18 @@
 			(justify mirror)
 		)
 	)
+	(gr_text "Pin 5: UART_TX  Pin 6: TDO/SWO"
+		(at 133.633867 77.4532 0)
+		(layer "B.SilkS")
+		(uuid "2ba694db-6224-4ee1-8d11-541be93d38c4")
+		(effects
+			(font
+				(size 0.7 0.7)
+				(thickness 0.12)
+			)
+			(justify mirror)
+		)
+	)
 	(gr_text "Pin 9: VTarget  Pin 10: nRST"
 		(at 134.7172 80.0532 0)
 		(layer "B.SilkS")
@@ -12901,14 +12875,40 @@
 			(justify mirror)
 		)
 	)
-	(gr_text "1:VTref 2:VTref 3:nTRST 4:GND 5:TDI 6:GND"
-		(at 113.917201 82.9032 0)
+	(gr_text "Pin 7: UART_RX  Pin 8: TDI"
+		(at 135.2172 78.7532 0)
 		(layer "B.SilkS")
-		(uuid "f1951699-633c-4e96-9271-df49c5279455")
+		(uuid "16c83023-ace0-4d30-89d1-a9af47fa3a14")
 		(effects
 			(font
 				(size 0.7 0.7)
 				(thickness 0.12)
+			)
+			(justify mirror)
+		)
+	)
+	(gr_text "20-PIN ARM JTAG (J2)"
+		(at 114.768627 80.9032 0)
+		(layer "B.SilkS")
+		(uuid "46306089-c8f2-4d71-aa1e-46c5fbf77db7")
+		(effects
+			(font
+				(size 1.2 1.2)
+				(thickness 0.2)
+				(bold yes)
+			)
+			(justify mirror)
+		)
+	)
+	(gr_text "10-PIN CORTEX DEBUG (J1/J3)"
+		(at 127.801959 72.8532 0)
+		(layer "B.SilkS")
+		(uuid "444b00e3-277a-477b-93a5-a51e6a26d755")
+		(effects
+			(font
+				(size 1.2 1.2)
+				(thickness 0.2)
+				(bold yes)
 			)
 			(justify mirror)
 		)
