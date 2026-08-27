@@ -20,29 +20,29 @@ every 5 seconds.
 ADC calibration uses `esp_adc_cal_characterize` (eFuse TP or Vref).
 20 samples are averaged per reading; 0.5 ms delay between samples.
 
-### Control (Vendor2 — software complete, hardware TODO)
+### Control (Vendor2 — calibrated operating range)
 
 The circuit topology in `main/vtarget_pwm.c`:
 
 | Component | Value | Role |
 | --------- | ----- | ---- |
 | GPIO3 | PWM output | Controls MOSFET gate |
-| R4 | 39 kΩ | Gate series resistor |
-| R5 | 10 kΩ | Gate pull-down |
-| C2 | 10 nF | PWM filter |
+| R4 | 100 Ω | Gate series resistor |
+| R5 | 43 kΩ | Gate pull-down |
+| C2 | 10 µF, 25 V | PWM filter |
 | Q1 | YJL2304A | N-channel MOSFET in AP1117-ADJ feedback |
 | U2 | AP1117-ADJ | Adjustable LDO regulator |
 | R6, R7 | 100 kΩ each | Feedback voltage divider |
 | C3 | 10 µF | Output capacitor |
 
-PWM: 1 kHz, 10-bit resolution (0–1023).  Duty 0% = MOSFET off = 5 V output;
-duty 100% = MOSFET on = 1.25 V output.  Linear interpolation between extremes.
+PWM: 1 kHz, 10-bit resolution (0–1023). DMM characterization found the usable,
+monotonic operating window to be PWM counts 358–982. The firmware maps its
+supported request range, 1324–4204 mV, into this window.
 
-> **TODO:** Confirm the PWM voltage output is correct across the full range.
-> Measure VTarget with a multimeter at several set-points (1.8 V, 2.5 V, 3.3 V, 5.0 V)
-> and compare against the requested value.  If deviation exceeds ~5%, the linear
-> interpolation in `vtarget_set_voltage()` (`main/vtarget_pwm.c`) needs to be
-> replaced with a calibration lookup table or polynomial fit.
+The DMM measured 1.3249 V at the low endpoint and 4.2047 V at the high endpoint.
+The endpoint calibration is valid, but the Q1/AP1117 feedback response remains
+nonlinear between endpoints. Use a lookup table rather than assuming that every
+intermediate request is accurate to within 5%.
 
 At boot: `vtarget_pwm_init()` is called and the default is set to 3300 mV.
 
@@ -60,16 +60,16 @@ At boot: `vtarget_pwm_init()` is called and the default is set to 3300 mV.
 | Encoding | `voltage_mv = response[1] \| (response[2] << 8)` — little-endian mV |
 | Error | `0xFFFF` (65535) if ADC is not initialised |
 
-### Vendor2 (0x82) — Set VTarget  *(software complete; hardware TODO)*
+### Vendor2 (0x82) — Set VTarget
 
 | Field | Detail |
 | ----- | ------ |
 | Command ID | `0x82` (`ID_DAP_Vendor2`) |
 | Request | `[0x82, voltage_low, voltage_high]` + zero padding |
-| Encoding | `voltage_mv` little-endian, valid range 1250–5000 mV |
+| Encoding | `voltage_mv` little-endian, valid range 1324–4204 mV |
 | Response | `[0x82, status]` |
 | Status 0x00 | OK — PWM duty updated |
-| Status 0x01 | Invalid range (outside 1250–5000 mV) |
+| Status 0x01 | Invalid range (outside 1324–4204 mV) |
 | Status 0xFF | Not supported on this target (non-C3/S3 build) |
 
 ### Serial debug commands (115200 baud, COM12)
@@ -92,7 +92,7 @@ void     vtarget_log_boot_reading(void);      // called once at startup
 
 // main/vtarget_pwm.h
 esp_err_t vtarget_pwm_init(void);             // call once at boot (main.c does this)
-esp_err_t vtarget_set_voltage(uint16_t mV);  // 1250-5000 mV
+esp_err_t vtarget_set_voltage(uint16_t mV);  // 1324-4204 mV
 esp_err_t vtarget_set_duty_raw(uint16_t d);  // 0-1023, for calibration
 uint16_t  vtarget_get_duty_raw(void);
 ```
@@ -133,18 +133,22 @@ Connecting to 192.168.137.123:3240 ...
   Attached (version=0x0111, status=OK)
 
 Sending DAP_Vendor2 (0x82): set VTarget = 3300 mV ...
-  NOTE: hardware circuit is TODO — software path only
   Status: 0x00 = OK
 
 Sending DAP_Vendor1 (0x81): read VTarget ...
-  Received 3 bytes: ['0x81', '0x62', '0x14']
+  Received 3 bytes: ['0x81', '0xe8', '0x0f']
 
-=== VTarget = 5218 mV  (5.218 V) ===
+=== VTarget = 4072 mV  (4.072 V) ===
 ```
 
-> **Note:** The read-back still shows ~5.2 V because the hardware circuit is not
-> yet complete.  The firmware receives and processes the Vendor2 command correctly
-> (PWM duty is updated on GPIO3), but the LDO feedback circuit is not assembled.
+The command response confirms that the PWM control update succeeded. Verify the
+actual output with Vendor1 or the DMM curve test, because intermediate voltage
+accuracy is limited by the nonlinear feedback response.
+
+## References
+
+- [ESP-IDF v4.4.2 LEDC API reference](https://docs.espressif.com/projects/esp-idf/en/v4.4.2/esp32/api-reference/peripherals/ledc.html)
+- [AP1117 adjustable regulator datasheet](https://www.diodes.com/assets/Datasheets/AP1117.pdf)
 
 ### Why not pyusb / the Windows USBIP kernel driver?
 

@@ -435,6 +435,22 @@ to `test_results/`:
 - `vtarget_pwm_vb_measurements.csv` - measurement data for every duty point
 - `vtarget_pwm_vb_curve.png` - average, RMS, and peak-to-peak plots
 
+### Calibrated DMM VTarget Curve
+
+Use `pwm_vtarget_dmm.py` with the VirtualBench DMM connected from VTarget to
+GND. It sweeps 101 normalized control points through the firmware's calibrated
+1324–4204 mV request range and creates a DMM-versus-DAP ADC curve.
+
+```bash
+python pwm_vtarget_dmm.py
+```
+
+The current calibration reaches approximately 1.325–4.205 V at the endpoints.
+The middle of the curve remains nonlinear, so use the graph to derive a lookup
+table before depending on an intermediate target voltage.
+
+- `vtarget_pwm_dmm_curve.png` - DMM and DAP ADC VTarget curve
+
 **Output Files** (in `test_results/` directory):
 - `vtarget_linearity_YYYYMMDD_HHMMSS.csv` - Statistical summary (DAP and DMM columns)
 - `vtarget_linearity_YYYYMMDD_HHMMSS_raw.csv` - All raw measurements (DAP and DMM samples)

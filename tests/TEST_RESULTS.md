@@ -238,50 +238,42 @@ The XIAO board has a Schottky diode on the USB input (≈ 0.5–0.7 V drop), lea
 
 ---
 
-## 10. VTarget Output Waveform Measurement
+## 10. Calibrated VTarget Control and DMM Curve
 
-**Script:** `tests/measure_vtarget_vb.py`
-**Instrument:** NI VB-8034 mixed-signal oscilloscope, Channel 1 (`mso/1`)
-**Acquisition:** Internal `niVB_MSO_ReadAnalog()` API, 5 MS/s, 2 ms window
-**Sweep:** 101 points from 0% to 100% PWM duty in 1% increments
-**Test date:** 2026-08-25
+**Scripts:** `tests/pwm_vtarget_dmm.py`, `tests/test_vtarget_pwm.py`
+**Instrument:** NI VB-8034 DMM and DAP Vendor1 ADC readback
+**Hardware:** R4 = 100 Ω, R5 = 43 kΩ, C2 = 10 µF / 25 V
+**Firmware range:** 1324–4204 mV mapped into the measured PWM-count window 358–982
+**Sweep:** 101 normalized control points, 0% to 100%
+**Test date:** 2026-08-27
 
-The script measures the VTarget output waveform directly on Channel 1 and
-calculates average voltage, RMS voltage, and peak-to-peak voltage from the
-acquired samples. The corresponding DAP Vendor2 command is sent before each
-measurement, and VTarget is restored to 3300 mV after the sweep.
+The DMM sweep measures VTarget while the firmware issues requests across the
+calibrated command range. The endpoint values are used by the new firmware
+mapping; the separate 100-point Vendor1 sweep evaluates intermediate accuracy.
 
-### 10.1 Representative Results
+### 10.1 DMM Endpoint Results
 
-| PWM duty | Command (mV) | Average (V) | RMS (V) | Peak-to-peak (V) |
-|---:|---:|---:|---:|---:|
-| 0% | 5000 | 4.194 | 4.194 | 0.123 |
-| 25% | 4062 | 4.115 | 4.116 | 0.453 |
-| 50% | 3123 | 3.973 | 3.980 | 0.741 |
-| 75% | 2188 | 3.772 | 3.783 | 0.947 |
-| 78% | 2075 | 3.734 | 3.745 | 1.152 |
-| 98% | 1323 | 1.272 | 1.273 | 0.165 |
-| 100% | 1250 | 1.274 | 1.275 | 0.370 |
+| Normalized control | Requested VTarget | DMM VTarget |
+|---:|---:|---:|
+| 0% | 4204 mV | 4.205 V maximum at 3% control |
+| 100% | 1324 mV | 1.325 V minimum |
 
 ### 10.2 Summary
 
 | Parameter | Result |
 | --- | --- |
-| Average VTarget range | **1.272-4.194 V** |
-| RMS VTarget range | **1.273-4.194 V** |
-| Maximum peak-to-peak ripple | **1.152 V at 78% duty** |
-| Samples per waveform | **10,137** |
-| PWM frequency | **1 kHz** |
-| Sweep result | **101/101 measurements acquired** |
+| DMM VTarget range | **1.3249-4.2047 V** |
+| DAP ADC vs DMM | **32 mV maximum, 14 mV average difference** |
+| DMM sweep result | **101/101 points completed** |
+| ADC full-range result | **16/100 points within ±5% of request** |
 
-The VTarget voltage decreases as PWM duty increases, but the output contains
-substantial PWM ripple through much of the range. RMS is close to the average
-voltage at low ripple and diverges as ripple increases. The output should be
-filtered and regulated before use as a target supply.
+The calibrated linear remap reaches both measured endpoints, but it does not
+linearize the Q1/AP1117 feedback network. A voltage-to-PWM lookup table derived
+from DMM measurements is required before relying on intermediate voltage values.
 
 **Output files:**
-- [`vtarget_pwm_vb_measurements.csv`](test_results/vtarget_pwm_vb_measurements.csv) - all 101 waveform measurements
-- [`vtarget_pwm_vb_curve.png`](test_results/vtarget_pwm_vb_curve.png) - average, RMS, and peak-to-peak curves
+- [`vtarget_pwm_dmm_curve.png`](test_results/vtarget_pwm_dmm_curve.png) - DMM and DAP ADC VTarget curves
+- [`vtarget_pwm_curve.png`](test_results/vtarget_pwm_curve.png) - 100-point DAP ADC accuracy curve
 
 ## TODO
 

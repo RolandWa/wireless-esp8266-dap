@@ -2542,7 +2542,7 @@
 				)
 			)
 		)
-		(property "Value" "10uF /16V"
+		(property "Value" "10uF /25V"
 			(at 0 1.43 270)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -2770,7 +2770,7 @@
 				)
 			)
 		)
-		(property "Value" "22k"
+		(property "Value" "100R"
 			(at 0 1.43 0)
 			(unlocked yes)
 			(layer "F.Fab")

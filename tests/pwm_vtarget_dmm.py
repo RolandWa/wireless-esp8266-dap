@@ -32,17 +32,12 @@ URB_FMT        = "!IIIIIIIIII8s"
 DIR_OUT, DIR_IN = 0, 1
 
 MAX_DUTY = 1023
-MIN_V_MV = 1250
-MAX_V_MV = 5000
+MIN_V_MV = 1324
+MAX_V_MV = 4204
 
 
 def duty_pct_to_mv(pct):
-    count = max(0, min(MAX_DUTY, round(MAX_DUTY * pct / 100.0)))
-    if count == 0:
-        return MAX_V_MV
-    if count >= MAX_DUTY:
-        return MIN_V_MV
-    return int(round(MAX_V_MV - count * (MAX_V_MV - MIN_V_MV) / MAX_DUTY))
+    return int(round(MAX_V_MV - pct * (MAX_V_MV - MIN_V_MV) / 100.0))
 
 
 def recv_exact(sock, n):
@@ -112,9 +107,9 @@ def save_plot(results):
     plt.figure(figsize=(10, 6))
     plt.plot(duty_percent, dmm_voltage, "o-", markersize=3, label="VirtualBench DMM")
     plt.plot(duty_percent, adc_voltage, "o-", markersize=3, label="DAP ADC")
-    plt.xlabel("PWM duty cycle (%)")
+    plt.xlabel("Calibrated VTarget control (%)")
     plt.ylabel("VTarget voltage (V)")
-    plt.title("VTarget Voltage vs PWM Duty Cycle")
+    plt.title("VTarget Voltage vs Calibrated Control")
     plt.xlim(0, 100)
     plt.grid(True, alpha=0.3)
     plt.legend()
@@ -139,7 +134,7 @@ def main():
     print(f"  VirtualBench: {args.vb}")
     print(f"  Wiring      : VTarget output shorted to VTref (GPIO2 ADC)")
     print(f"  DMM probes  : V terminal on VTarget pad, COM on GND")
-    print("  Sweep       : 0% to 100% PWM duty in 1% increments")
+    print("  Sweep       : 0% to 100% calibrated VTarget range in 1% increments")
     print()
 
     vb_dev = pvb.PyVirtualBench(args.vb)

@@ -2,14 +2,14 @@
  * @file vtarget_pwm.h
  * @brief Programmable VTarget voltage control using PWM
  * 
- * Provides functions to control the target board voltage (VTarget) from 1.25V to 5V
+ * Provides functions to control the target board voltage (VTarget) from 1.324V to 4.204V
  * using PWM-controlled MOSFET in the AP1117-ADJ feedback network.
  * 
  * Hardware Requirements:
  * - GPIO3: PWM output
- * - R4 (39k): Gate series resistor
- * - R5 (10k): Gate pull-down
- * - C2 (10nF): PWM filter capacitor
+ * - R4 (100R): Gate series resistor
+ * - R5 (43k): Gate pull-down
+ * - C2 (10uF, 25V): PWM filter capacitor
  * - Q1 (YJL2304A): N-channel MOSFET
  * - U2 (AP1117-ADJ): Adjustable LDO regulator
  * - R6, R7 (100k each): Feedback voltage divider
@@ -36,7 +36,7 @@ extern "C" {
  * - Frequency: 1 kHz
  * - Resolution: 10-bit (1024 steps)
  * - GPIO: GPIO3
- * - Initial state: 0% duty (5V output)
+ * - Initial state: 0% duty
  * 
  * @return ESP_OK on success, error code otherwise
  */
@@ -46,19 +46,19 @@ esp_err_t vtarget_pwm_init(void);
  * @brief Set VTarget output voltage
  * 
  * Adjusts the PWM duty cycle to achieve the desired output voltage.
- * The relationship is inverse: higher duty → lower voltage.
+ * The relationship is inverse within the calibrated monotonic duty window.
  * 
  * Voltage Control:
- * - 0% duty → MOSFET OFF → 5.0V output
- * - 100% duty → MOSFET ON → 1.25V output
- * - Linear interpolation between these extremes
+ * - PWM count 358 → approximately 4.204V output
+ * - PWM count 982 → approximately 1.324V output
+ * - Linear interpolation between these calibrated limits
  * 
  * Note: Actual voltage may require calibration due to:
  * - MOSFET R_DS(on) variation
  * - Temperature effects
  * - Load current
  * 
- * @param voltage_mv Target voltage in millivolts (1250 to 5000)
+ * @param voltage_mv Target voltage in millivolts (1324 to 4204)
  * @return ESP_OK on success, ESP_ERR_INVALID_ARG if out of range
  */
 esp_err_t vtarget_set_voltage(uint16_t voltage_mv);
@@ -70,8 +70,7 @@ esp_err_t vtarget_set_voltage(uint16_t voltage_mv);
  * Useful for calibration and testing.
  * 
  * @param duty_cycle Raw duty cycle value (0 to 1023)
- *                   0 = MOSFET OFF (max voltage ~5V)
- *                   1023 = MOSFET ON (min voltage ~1.25V)
+ *                   Values outside the calibrated 358-982 range are for testing only.
  * @return ESP_OK on success, ESP_ERR_INVALID_ARG if out of range
  */
 esp_err_t vtarget_set_duty_raw(uint16_t duty_cycle);
@@ -88,8 +87,7 @@ uint16_t vtarget_get_duty_raw(void);
 /**
  * @brief Disable VTarget PWM output
  * 
- * Stops the PWM output and sets duty to 0% (MOSFET OFF).
- * VTarget will go to maximum voltage (~5V).
+ * Stops the PWM output and sets duty to 0%.
  * 
  * @return ESP_OK on success, error code otherwise
  */
@@ -99,7 +97,7 @@ esp_err_t vtarget_pwm_disable(void);
 #define VTARGET_SET_1V8()   vtarget_set_voltage(1800)
 #define VTARGET_SET_3V0()   vtarget_set_voltage(3000)
 #define VTARGET_SET_3V3()   vtarget_set_voltage(3300)
-#define VTARGET_SET_5V0()   vtarget_set_voltage(5000)
+#define VTARGET_SET_4V2()   vtarget_set_voltage(4200)
 
 #ifdef __cplusplus
 }

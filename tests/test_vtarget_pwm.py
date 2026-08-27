@@ -35,11 +35,13 @@ RESPONSE_CMD      = 0x00000003
 URB_FMT           = "!IIIIIIIIII8s"
 DIR_OUT, DIR_IN   = 0, 1
 
-# Voltage sweep: exactly 100 points from 1.25 V to 5.0 V, including key voltages.
-_KEY_VOLTAGES_MV = (1250, 1800, 2500, 3000, 3300, 3600, 4096, 5000)
+# Voltage sweep: exactly 100 points across the calibrated monotonic range.
+_VTARGET_MIN_MV = 1324
+_VTARGET_MAX_MV = 4204
+_KEY_VOLTAGES_MV = (1324, 1800, 2500, 3000, 3300, 3600, 4096, 4204)
 _SWEEP_POINTS = 100
 _SWEEP_VOLTAGES_MV = [
-    round(1250 + index * (5000 - 1250) / (_SWEEP_POINTS - 1))
+    round(_VTARGET_MIN_MV + index * (_VTARGET_MAX_MV - _VTARGET_MIN_MV) / (_SWEEP_POINTS - 1))
     for index in range(_SWEEP_POINTS)
 ]
 
@@ -110,7 +112,7 @@ def set_vtarget(sock, seqnum, voltage_mv):
         raise RuntimeError(f"Bad set response: {[hex(b) for b in resp[:4]]}")
     status = resp[1]
     if status == 0x01:
-        raise ValueError(f"Voltage {voltage_mv} mV out of range (1250-5000)")
+        raise ValueError(f"Voltage {voltage_mv} mV out of range ({_VTARGET_MIN_MV}-{_VTARGET_MAX_MV})")
     if status == 0xFF:
         raise RuntimeError("Set VTarget not supported on this firmware")
     return seqnum  # status 0x00 = OK
@@ -140,7 +142,7 @@ def plot_results(results):
         print("  Plot skipped: matplotlib is not installed")
         return
 
-    duty_percent = [100 * (5000 - result[0]) / (5000 - 1250) for result in results]
+    duty_percent = [100 * (_VTARGET_MAX_MV - result[0]) / (_VTARGET_MAX_MV - _VTARGET_MIN_MV) for result in results]
     measured_mv = [result[1] for result in results]
     setpoint_mv = [result[0] for result in results]
 
@@ -151,9 +153,9 @@ def plot_results(results):
     plt.figure(figsize=(10, 6))
     plt.plot(duty_percent, measured_mv, "o-", markersize=3, label="Measured VTarget")
     plt.plot(duty_percent, setpoint_mv, "--", label="Requested VTarget")
-    plt.xlabel("PWM duty cycle (%)")
+    plt.xlabel("Calibrated VTarget control (%)")
     plt.ylabel("VTarget voltage (mV)")
-    plt.title("VTarget Voltage vs PWM Duty Cycle")
+    plt.title("VTarget Voltage vs Calibrated Control")
     plt.xlim(0, 100)
     plt.grid(True, alpha=0.3)
     plt.legend()

@@ -29,9 +29,11 @@ static const char *TAG = "vtarget_pwm";
 #define VTARGET_PWM_RESOLUTION  LEDC_TIMER_10_BIT // 10-bit (0-1023)
 #define VTARGET_PWM_MAX_DUTY    ((1 << 10) - 1)  // 1023
 
-// Voltage calibration constants
-#define VTARGET_MIN_VOLTAGE_MV  1250   // Minimum output: 1.25V
-#define VTARGET_MAX_VOLTAGE_MV  5000   // Maximum output: 5.0V
+// Calibrated VTarget operating range, measured with the VirtualBench DMM.
+#define VTARGET_MIN_VOLTAGE_MV  1324   // Minimum monotonic output voltage
+#define VTARGET_MAX_VOLTAGE_MV  4204   // Maximum monotonic output voltage
+#define VTARGET_MIN_DUTY        358    // 35% duty at the maximum output voltage
+#define VTARGET_MAX_DUTY        982    // 96% duty at the minimum output voltage
 
 /**
  * @brief Initialize PWM for VTarget voltage control
@@ -121,26 +123,19 @@ esp_err_t vtarget_set_voltage(uint16_t voltage_mv)
         return ESP_ERR_INVALID_ARG;
     }
 
-    // Calculate duty cycle (inverse relationship)
-    // Higher voltage → Lower duty cycle (MOSFET more OFF)
-    // Lower voltage → Higher duty cycle (MOSFET more ON)
+    // Map requests through the measured monotonic duty-cycle window.
+    // Higher voltage uses lower duty; lower voltage uses higher duty.
     uint32_t duty_cycle;
     
     if (voltage_mv >= VTARGET_MAX_VOLTAGE_MV) {
-        duty_cycle = 0;  // Maximum voltage, MOSFET OFF
+        duty_cycle = VTARGET_MIN_DUTY;
     } else if (voltage_mv <= VTARGET_MIN_VOLTAGE_MV) {
-        duty_cycle = VTARGET_PWM_MAX_DUTY;  // Minimum voltage, MOSFET ON
+        duty_cycle = VTARGET_MAX_DUTY;
     } else {
-        // TODO: confirmed the PWM voltage works correct to setup target voltage
-        // The linear interpolation below assumes a perfectly linear MOSFET/AP1117-ADJ
-        // response across the full 1.25V-5V range. Measure actual VTarget output at
-        // several set-points (e.g. 1.8V, 2.5V, 3.3V, 5.0V) with a multimeter and
-        // compare against the requested voltage_mv. If deviation > ~5%, replace with
-        // a lookup table or polynomial fit using measured calibration points.
-        // duty = MAX_DUTY * (MAX_V - target_V) / (MAX_V - MIN_V)
         uint32_t voltage_range = VTARGET_MAX_VOLTAGE_MV - VTARGET_MIN_VOLTAGE_MV;
         uint32_t voltage_offset = VTARGET_MAX_VOLTAGE_MV - voltage_mv;
-        duty_cycle = (VTARGET_PWM_MAX_DUTY * voltage_offset) / voltage_range;
+        duty_cycle = VTARGET_MIN_DUTY
+            + ((VTARGET_MAX_DUTY - VTARGET_MIN_DUTY) * voltage_offset) / voltage_range;
     }
 
     // Set the PWM duty cycle

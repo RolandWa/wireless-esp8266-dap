@@ -6306,7 +6306,7 @@
 				)
 			)
 		)
-		(property "Value" "22k"
+		(property "Value" "100R"
 			(at 73.66 166.37 90)
 			(effects
 				(font
@@ -10542,7 +10542,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10uF /16V"
+		(property "Value" "10uF /25V"
 			(at 107.95 176.5299 0)
 			(effects
 				(font
