@@ -2770,7 +2770,7 @@
 				)
 			)
 		)
-		(property "Value" "100R"
+		(property "Value" "22k"
 			(at 0 1.43 0)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -6272,7 +6272,7 @@
 				)
 			)
 		)
-		(property "Value" "12k"
+		(property "Value" "1.2k"
 			(at 0 1.43 90)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -7523,7 +7523,7 @@
 				)
 			)
 		)
-		(property "Value" "27k"
+		(property "Value" "2.7k"
 			(at 0 1.43 180)
 			(unlocked yes)
 			(layer "F.Fab")

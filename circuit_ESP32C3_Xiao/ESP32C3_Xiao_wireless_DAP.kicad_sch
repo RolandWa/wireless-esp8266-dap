@@ -3909,16 +3909,6 @@
 		)
 		(uuid "0c42b6f9-d7c1-43e5-84bd-c0ecc8c8fa90")
 	)
-	(text "R4 - 40k || 39k\nR5 - 43k"
-		(exclude_from_sim no)
-		(at 102.235 189.23 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-		)
-		(uuid "15899cc9-4cf0-4788-833f-f19e1564c798")
-	)
 	(text "AO3400A"
 		(exclude_from_sim no)
 		(at 118.11 184.912 0)
@@ -6306,7 +6296,7 @@
 				)
 			)
 		)
-		(property "Value" "100R"
+		(property "Value" "22k"
 			(at 73.66 166.37 90)
 			(effects
 				(font
@@ -10956,7 +10946,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "12k"
+		(property "Value" "1.2k"
 			(at 140.97 139.6999 0)
 			(effects
 				(font
@@ -11214,7 +11204,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "27k"
+		(property "Value" "2.7k"
 			(at 130.81 166.3699 0)
 			(effects
 				(font
