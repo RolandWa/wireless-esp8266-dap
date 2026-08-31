@@ -197,7 +197,7 @@ uint32_t DAP_ProcessVendorCommand(const uint8_t *request, uint8_t *response) {
 #endif
       break;
 
-    case ID_DAP_Vendor2:  // Set VTarget voltage (1324-4204 mV)
+    case ID_DAP_Vendor2:  // Set VTarget voltage (1326-4206 mV)
 #if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
       {
         num += 2U << 16;  // 2 bytes in request (voltage low, high)
@@ -212,8 +212,8 @@ uint32_t DAP_ProcessVendorCommand(const uint8_t *request, uint8_t *response) {
           *response++ = 0x00;  // Success
           ESP_LOGI(TAG, "VTarget set successfully to %d mV", voltage_mv);
         } else if (ret == ESP_ERR_INVALID_ARG) {
-          *response++ = 0x01;  // Invalid voltage range (not 1324-4204 mV)
-          ESP_LOGW(TAG, "Invalid voltage range: %d mV (valid: 1324-4204 mV)", voltage_mv);
+          *response++ = 0x01;  // Invalid voltage range (not 1326-4206 mV)
+          ESP_LOGW(TAG, "Invalid voltage range: %d mV (valid: 1326-4206 mV)", voltage_mv);
         } else {
           *response++ = 0xFF;  // Other error
           ESP_LOGE(TAG, "Failed to set VTarget: %s", esp_err_to_name(ret));

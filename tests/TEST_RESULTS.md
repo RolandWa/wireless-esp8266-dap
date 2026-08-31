@@ -243,37 +243,40 @@ The XIAO board has a Schottky diode on the USB input (≈ 0.5–0.7 V drop), lea
 **Scripts:** `tests/pwm_vtarget_dmm.py`, `tests/test_vtarget_pwm.py`
 **Instrument:** NI VB-8034 DMM and DAP Vendor1 ADC readback
 **Hardware:** R4 = 100 Ω, R5 = 43 kΩ, C2 = 10 µF / 25 V
-**Firmware range:** 1324–4204 mV mapped into the measured PWM-count window 358–982
+**Firmware range:** 1326–4206 mV, interpolated through a 21-point calibration
+table (`VTARGET_CAL_TABLE` in `main/vtarget_pwm.c`) spanning PWM counts 358–982
 **Sweep:** 101 normalized control points, 0% to 100%
-**Test date:** 2026-08-27
+**Test date:** 2026-08-31
 
 The DMM sweep measures VTarget while the firmware issues requests across the
-calibrated command range. The endpoint values are used by the new firmware
-mapping; the separate 100-point Vendor1 sweep evaluates intermediate accuracy.
+calibrated command range. The 100-point Vendor1 sweep evaluates intermediate
+accuracy against the piecewise-linear calibration table.
 
 ### 10.1 DMM Endpoint Results
 
 | Normalized control | Requested VTarget | DMM VTarget |
 |---:|---:|---:|
-| 0% | 4204 mV | 4.205 V maximum at 3% control |
-| 100% | 1324 mV | 1.325 V minimum |
+| 0% | 4206 mV | 4.201 V maximum |
+| 100% | 1326 mV | 1.322 V minimum |
 
 ### 10.2 Summary
 
 | Parameter | Result |
 | --- | --- |
-| DMM VTarget range | **1.3249-4.2047 V** |
-| DAP ADC vs DMM | **32 mV maximum, 14 mV average difference** |
+| DMM VTarget range | **1.322-4.201 V** |
+| DAP ADC vs DMM | **32 mV maximum, 15 mV average difference** |
 | DMM sweep result | **101/101 points completed** |
-| ADC full-range result | **16/100 points within ±5% of request** |
+| ADC full-range result | **100/100 points within ±5% of request** |
 
-The calibrated linear remap reaches both measured endpoints, but it does not
-linearize the Q1/AP1117 feedback network. A voltage-to-PWM lookup table derived
-from DMM measurements is required before relying on intermediate voltage values.
+Replacing the two-point linear guess with a 21-point calibration table
+(measured duty ↔ DMM voltage, `tests/pwm_vtarget_dmm.py` saves the underlying
+CSV) raised the intermediate accuracy result from 16/100 to 100/100. Recompute
+the table if R4/R5/C2 or Q1 change.
 
 **Output files:**
 - [`vtarget_pwm_dmm_curve.png`](test_results/vtarget_pwm_dmm_curve.png) - DMM and DAP ADC VTarget curves
 - [`vtarget_pwm_curve.png`](test_results/vtarget_pwm_curve.png) - 100-point DAP ADC accuracy curve
+- [`vtarget_pwm_dmm_measurements.csv`](test_results/vtarget_pwm_dmm_measurements.csv) - raw duty/ADC/DMM data used to build the calibration table
 
 ## TODO
 

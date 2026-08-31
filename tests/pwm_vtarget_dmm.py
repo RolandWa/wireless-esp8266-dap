@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+import csv
 import socket
 import struct
 import sys
@@ -32,12 +33,28 @@ URB_FMT        = "!IIIIIIIIII8s"
 DIR_OUT, DIR_IN = 0, 1
 
 MAX_DUTY = 1023
-MIN_V_MV = 1324
-MAX_V_MV = 4204
+MIN_V_MV = 1326
+MAX_V_MV = 4206
+
+# Must mirror VTARGET_MIN_DUTY/VTARGET_MAX_DUTY in main/vtarget_pwm.c so the
+# recorded duty_count matches what the firmware actually drove for each mv.
+FW_MIN_DUTY = 358
+FW_MAX_DUTY = 982
 
 
 def duty_pct_to_mv(pct):
     return int(round(MAX_V_MV - pct * (MAX_V_MV - MIN_V_MV) / 100.0))
+
+
+def mv_to_fw_duty_count(voltage_mv):
+    """Reproduce the firmware's mv -> PWM duty_cycle mapping (vtarget_set_voltage)."""
+    if voltage_mv >= MAX_V_MV:
+        return FW_MIN_DUTY
+    if voltage_mv <= MIN_V_MV:
+        return FW_MAX_DUTY
+    voltage_range = MAX_V_MV - MIN_V_MV
+    voltage_offset = MAX_V_MV - voltage_mv
+    return FW_MIN_DUTY + ((FW_MAX_DUTY - FW_MIN_DUTY) * voltage_offset) // voltage_range
 
 
 def recv_exact(sock, n):
@@ -119,6 +136,19 @@ def save_plot(results):
     print(f"  Graph saved to: {output_path}")
 
 
+def save_csv(results):
+    output_dir = Path(__file__).resolve().parent / "test_results"
+    output_dir.mkdir(exist_ok=True)
+    output_path = output_dir / "vtarget_pwm_dmm_measurements.csv"
+
+    with output_path.open("w", newline="") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(["duty_percent", "commanded_mv", "duty_count", "adc_mv", "dmm_mv", "diff_mv"])
+        for pct, mv, adc_mv, dmm_mv, diff in results:
+            writer.writerow([pct, mv, mv_to_fw_duty_count(mv), adc_mv, f"{dmm_mv:.1f}", f"{diff:.1f}"])
+    print(f"  CSV saved to: {output_path}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ip",    default=DEFAULT_IP)
@@ -192,6 +222,7 @@ def main():
         else:
             print("  PWM voltage control is working!")
         save_plot(results)
+        save_csv(results)
     return 0
 
 

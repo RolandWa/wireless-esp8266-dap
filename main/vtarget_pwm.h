@@ -45,20 +45,19 @@ esp_err_t vtarget_pwm_init(void);
 /**
  * @brief Set VTarget output voltage
  * 
- * Adjusts the PWM duty cycle to achieve the desired output voltage.
- * The relationship is inverse within the calibrated monotonic duty window.
+ * Adjusts the PWM duty cycle to achieve the desired output voltage using a
+ * piecewise-linear calibration table measured with a DMM, since the
+ * MOSFET/AP1117-ADJ feedback response is not linear across the range.
  * 
  * Voltage Control:
- * - PWM count 358 → approximately 4.204V output
- * - PWM count 982 → approximately 1.324V output
- * - Linear interpolation between these calibrated limits
+ * - Interpolated between 21 DMM-measured (duty, voltage) points
+ * - PWM count 358 → approximately 4.206V output
+ * - PWM count 982 → approximately 1.326V output
  * 
- * Note: Actual voltage may require calibration due to:
- * - MOSFET R_DS(on) variation
- * - Temperature effects
- * - Load current
+ * Note: Recalibrate VTARGET_CAL_TABLE in vtarget_pwm.c if hardware changes
+ * (resistor values, MOSFET part, load current).
  * 
- * @param voltage_mv Target voltage in millivolts (1324 to 4204)
+ * @param voltage_mv Target voltage in millivolts (1326 to 4206)
  * @return ESP_OK on success, ESP_ERR_INVALID_ARG if out of range
  */
 esp_err_t vtarget_set_voltage(uint16_t voltage_mv);

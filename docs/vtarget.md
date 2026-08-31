@@ -35,14 +35,14 @@ The circuit topology in `main/vtarget_pwm.c`:
 | R6, R7 | 100 kΩ each | Feedback voltage divider |
 | C3 | 10 µF | Output capacitor |
 
-PWM: 1 kHz, 10-bit resolution (0–1023). DMM characterization found the usable,
-monotonic operating window to be PWM counts 358–982. The firmware maps its
-supported request range, 1324–4204 mV, into this window.
+PWM: 1 kHz, 10-bit resolution (0–1023). The firmware interpolates the
+requested voltage through a 21-point calibration table measured with a DMM
+(`VTARGET_CAL_TABLE` in `main/vtarget_pwm.c`), spanning PWM counts 358–982
+and 1326–4206 mV, instead of assuming a straight line between two endpoints.
 
-The DMM measured 1.3249 V at the low endpoint and 4.2047 V at the high endpoint.
-The endpoint calibration is valid, but the Q1/AP1117 feedback response remains
-nonlinear between endpoints. Use a lookup table rather than assuming that every
-intermediate request is accurate to within 5%.
+The Q1/AP1117 feedback response is nonlinear, especially in the middle of the
+range. Recalibrate the table (rerun `tests/pwm_vtarget_dmm.py`, which now also
+saves `vtarget_pwm_dmm_measurements.csv`) if R4/R5/C2 or Q1 change.
 
 At boot: `vtarget_pwm_init()` is called and the default is set to 3300 mV.
 
@@ -66,10 +66,10 @@ At boot: `vtarget_pwm_init()` is called and the default is set to 3300 mV.
 | ----- | ------ |
 | Command ID | `0x82` (`ID_DAP_Vendor2`) |
 | Request | `[0x82, voltage_low, voltage_high]` + zero padding |
-| Encoding | `voltage_mv` little-endian, valid range 1324–4204 mV |
+| Encoding | `voltage_mv` little-endian, valid range 1326–4206 mV |
 | Response | `[0x82, status]` |
 | Status 0x00 | OK — PWM duty updated |
-| Status 0x01 | Invalid range (outside 1324–4204 mV) |
+| Status 0x01 | Invalid range (outside 1326–4206 mV) |
 | Status 0xFF | Not supported on this target (non-C3/S3 build) |
 
 ### Serial debug commands (115200 baud, COM12)
@@ -92,7 +92,7 @@ void     vtarget_log_boot_reading(void);      // called once at startup
 
 // main/vtarget_pwm.h
 esp_err_t vtarget_pwm_init(void);             // call once at boot (main.c does this)
-esp_err_t vtarget_set_voltage(uint16_t mV);  // 1324-4204 mV
+esp_err_t vtarget_set_voltage(uint16_t mV);  // 1326-4206 mV, calibration-table interpolated
 esp_err_t vtarget_set_duty_raw(uint16_t d);  // 0-1023, for calibration
 uint16_t  vtarget_get_duty_raw(void);
 ```

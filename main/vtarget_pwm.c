@@ -29,11 +29,57 @@ static const char *TAG = "vtarget_pwm";
 #define VTARGET_PWM_RESOLUTION  LEDC_TIMER_10_BIT // 10-bit (0-1023)
 #define VTARGET_PWM_MAX_DUTY    ((1 << 10) - 1)  // 1023
 
-// Calibrated VTarget operating range, measured with the VirtualBench DMM.
-#define VTARGET_MIN_VOLTAGE_MV  1324   // Minimum monotonic output voltage
-#define VTARGET_MAX_VOLTAGE_MV  4204   // Maximum monotonic output voltage
-#define VTARGET_MIN_DUTY        358    // 35% duty at the maximum output voltage
-#define VTARGET_MAX_DUTY        982    // 96% duty at the minimum output voltage
+// Calibration curve measured with the VirtualBench DMM (2026-08-31), duty
+// ascending / voltage descending. Replaces a two-point linear guess because
+// the Q1/AP1117 feedback response is nonlinear across the duty range.
+typedef struct {
+    uint16_t duty;
+    uint16_t voltage_mv;
+} vtarget_cal_point_t;
+
+static const vtarget_cal_point_t VTARGET_CAL_TABLE[] = {
+    { 358, 4206 }, { 389, 4197 }, { 420, 4183 }, { 451, 4166 }, { 482, 4131 },
+    { 514, 4080 }, { 545, 4006 }, { 576, 3902 }, { 607, 3757 }, { 638, 3569 },
+    { 670, 3312 }, { 701, 3012 }, { 732, 2654 }, { 763, 2269 }, { 794, 1892 },
+    { 826, 1569 }, { 857, 1396 }, { 888, 1357 }, { 919, 1343 }, { 950, 1329 },
+    { 982, 1326 },
+};
+#define VTARGET_CAL_POINTS (sizeof(VTARGET_CAL_TABLE) / sizeof(VTARGET_CAL_TABLE[0]))
+
+#define VTARGET_MIN_VOLTAGE_MV  1326   // VTARGET_CAL_TABLE last entry
+#define VTARGET_MAX_VOLTAGE_MV  4206   // VTARGET_CAL_TABLE first entry
+
+/**
+ * @brief Map a requested voltage to a PWM duty using the calibration table
+ *
+ * Performs piecewise-linear interpolation between the two bracketing
+ * measured points instead of assuming a straight line across the full range.
+ */
+static uint32_t vtarget_interp_duty(uint16_t voltage_mv)
+{
+    size_t last = VTARGET_CAL_POINTS - 1;
+
+    if (voltage_mv >= VTARGET_CAL_TABLE[0].voltage_mv) {
+        return VTARGET_CAL_TABLE[0].duty;
+    }
+    if (voltage_mv <= VTARGET_CAL_TABLE[last].voltage_mv) {
+        return VTARGET_CAL_TABLE[last].duty;
+    }
+
+    for (size_t i = 0; i < last; i++) {
+        uint16_t v_hi = VTARGET_CAL_TABLE[i].voltage_mv;
+        uint16_t v_lo = VTARGET_CAL_TABLE[i + 1].voltage_mv;
+        if (voltage_mv <= v_hi && voltage_mv >= v_lo) {
+            uint16_t duty_lo = VTARGET_CAL_TABLE[i].duty;
+            uint16_t duty_hi = VTARGET_CAL_TABLE[i + 1].duty;
+            uint32_t span_v = v_hi - v_lo;
+            uint32_t offset_v = v_hi - voltage_mv;
+            return duty_lo + ((uint32_t)(duty_hi - duty_lo) * offset_v) / span_v;
+        }
+    }
+
+    return VTARGET_CAL_TABLE[last].duty;
+}
 
 /**
  * @brief Initialize PWM for VTarget voltage control
@@ -104,14 +150,10 @@ esp_err_t vtarget_pwm_init(void)
 /**
  * @brief Set VTarget voltage using PWM duty cycle
  * 
- * Controls the MOSFET gate voltage to adjust the AP1117-ADJ feedback
- * network and set the desired output voltage.
+ * Looks up the requested voltage in VTARGET_CAL_TABLE and interpolates
+ * between the two nearest measured points to find the PWM duty cycle.
  * 
- * PWM Duty Cycle vs. Output Voltage:
- * - 0% duty → MOSFET OFF → High resistance → 5.0V output
- * - 100% duty → MOSFET ON → Low resistance → 1.25V output
- * 
- * @param voltage_mv Target voltage in millivolts (1250 to 5000)
+ * @param voltage_mv Target voltage in millivolts (1326 to 4206)
  * @return ESP_OK on success, ESP_ERR_INVALID_ARG if out of range
  */
 esp_err_t vtarget_set_voltage(uint16_t voltage_mv)
@@ -123,20 +165,7 @@ esp_err_t vtarget_set_voltage(uint16_t voltage_mv)
         return ESP_ERR_INVALID_ARG;
     }
 
-    // Map requests through the measured monotonic duty-cycle window.
-    // Higher voltage uses lower duty; lower voltage uses higher duty.
-    uint32_t duty_cycle;
-    
-    if (voltage_mv >= VTARGET_MAX_VOLTAGE_MV) {
-        duty_cycle = VTARGET_MIN_DUTY;
-    } else if (voltage_mv <= VTARGET_MIN_VOLTAGE_MV) {
-        duty_cycle = VTARGET_MAX_DUTY;
-    } else {
-        uint32_t voltage_range = VTARGET_MAX_VOLTAGE_MV - VTARGET_MIN_VOLTAGE_MV;
-        uint32_t voltage_offset = VTARGET_MAX_VOLTAGE_MV - voltage_mv;
-        duty_cycle = VTARGET_MIN_DUTY
-            + ((VTARGET_MAX_DUTY - VTARGET_MIN_DUTY) * voltage_offset) / voltage_range;
-    }
+    uint32_t duty_cycle = vtarget_interp_duty(voltage_mv);
 
     // Set the PWM duty cycle
     esp_err_t ret = ledc_set_duty(VTARGET_PWM_MODE, VTARGET_PWM_CHANNEL, duty_cycle);
