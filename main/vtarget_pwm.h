@@ -2,7 +2,7 @@
  * @file vtarget_pwm.h
  * @brief Programmable VTarget voltage control using PWM
  * 
- * Provides functions to control the target board voltage (VTarget) from 1.324V to 4.204V
+ * Provides functions to control the target board voltage (VTarget) from 1.326V to 4.200V
  * using PWM-controlled MOSFET in the AP1117-ADJ feedback network.
  * 
  * Hardware Requirements:
@@ -50,14 +50,17 @@ esp_err_t vtarget_pwm_init(void);
  * MOSFET/AP1117-ADJ feedback response is not linear across the range.
  * 
  * Voltage Control:
- * - Interpolated between 21 DMM-measured (duty, voltage) points
- * - PWM count 358 → approximately 4.206V output
+ * - Interpolated between 25 DMM-measured (duty, voltage) points
+ * - PWM count 358 → approximately 4.200V output
  * - PWM count 982 → approximately 1.326V output
  * 
- * Note: Recalibrate VTARGET_CAL_TABLE in vtarget_pwm.c if hardware changes
- * (resistor values, MOSFET part, load current).
+ * Note: this table is the median PCB-04/08/09/10 cluster response.
+ * Recalibrate VTARGET_CAL_TABLE in vtarget_pwm.c if hardware changes
+ * (resistor values, MOSFET part, load current), and confirm any other
+ * board fits it within +/-5% before relying on it. See
+ * circuit_ESP32C3_Xiao/documentations/VTARGET_BATCH_ANALYSIS.md.
  * 
- * @param voltage_mv Target voltage in millivolts (1326 to 4206)
+ * @param voltage_mv Target voltage in millivolts (1326 to 4200)
  * @return ESP_OK on success, ESP_ERR_INVALID_ARG if out of range
  */
 esp_err_t vtarget_set_voltage(uint16_t voltage_mv);

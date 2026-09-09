@@ -10,6 +10,7 @@ Usage:
 
 import argparse
 import csv
+from datetime import datetime
 import socket
 import struct
 import sys
@@ -33,13 +34,19 @@ URB_FMT        = "!IIIIIIIIII8s"
 DIR_OUT, DIR_IN = 0, 1
 
 MAX_DUTY = 1023
-MIN_V_MV = 1326
-MAX_V_MV = 4206
 
-# Must mirror VTARGET_MIN_DUTY/VTARGET_MAX_DUTY in main/vtarget_pwm.c so the
-# recorded duty_count matches what the firmware actually drove for each mv.
-FW_MIN_DUTY = 358
-FW_MAX_DUTY = 982
+# Must mirror VTARGET_CAL_TABLE in main/vtarget_pwm.c so the recorded
+# duty_count matches what the firmware actually drove for each mv.
+FW_CAL_TABLE = [
+    (358, 4200), (559, 4072), (612, 3943), (647, 3811), (678, 3650),
+    (699, 3514), (716, 3385), (732, 3250), (747, 3110), (763, 2945),
+    (775, 2813), (787, 2674), (797, 2552), (808, 2418), (819, 2281),
+    (831, 2132), (841, 2010), (851, 1892), (862, 1772), (872, 1673),
+    (883, 1575), (898, 1465), (912, 1397), (929, 1361), (982, 1326),
+]
+
+MIN_V_MV = FW_CAL_TABLE[-1][1]
+MAX_V_MV = FW_CAL_TABLE[0][1]
 
 
 def duty_pct_to_mv(pct):
@@ -49,12 +56,13 @@ def duty_pct_to_mv(pct):
 def mv_to_fw_duty_count(voltage_mv):
     """Reproduce the firmware's mv -> PWM duty_cycle mapping (vtarget_set_voltage)."""
     if voltage_mv >= MAX_V_MV:
-        return FW_MIN_DUTY
+        return FW_CAL_TABLE[0][0]
     if voltage_mv <= MIN_V_MV:
-        return FW_MAX_DUTY
-    voltage_range = MAX_V_MV - MIN_V_MV
-    voltage_offset = MAX_V_MV - voltage_mv
-    return FW_MIN_DUTY + ((FW_MAX_DUTY - FW_MIN_DUTY) * voltage_offset) // voltage_range
+        return FW_CAL_TABLE[-1][0]
+    for (duty_lo, v_hi), (duty_hi, v_lo) in zip(FW_CAL_TABLE, FW_CAL_TABLE[1:]):
+        if v_lo <= voltage_mv <= v_hi:
+            return duty_lo + (duty_hi - duty_lo) * (v_hi - voltage_mv) // (v_hi - v_lo)
+    return FW_CAL_TABLE[-1][0]
 
 
 def recv_exact(sock, n):
@@ -106,7 +114,14 @@ def dap_read_vtarget(sock, seq):
     return mv, seq + 2
 
 
-def save_plot(results):
+def output_stem(board_id):
+    return "vtarget_" + "".join(
+        character if character.isalnum() or character in "-_" else "_"
+        for character in board_id
+    )
+
+
+def save_plot(results, board_id):
     try:
         import matplotlib.pyplot as plt
     except ImportError:
@@ -115,7 +130,7 @@ def save_plot(results):
 
     output_dir = Path(__file__).resolve().parent / "test_results"
     output_dir.mkdir(exist_ok=True)
-    output_path = output_dir / "vtarget_pwm_dmm_curve.png"
+    output_path = output_dir / f"{output_stem(board_id)}_curve.png"
 
     duty_percent = [result[0] for result in results]
     adc_voltage = [result[2] / 1000 for result in results]
@@ -126,7 +141,7 @@ def save_plot(results):
     plt.plot(duty_percent, adc_voltage, "o-", markersize=3, label="DAP ADC")
     plt.xlabel("Calibrated VTarget control (%)")
     plt.ylabel("VTarget voltage (V)")
-    plt.title("VTarget Voltage vs Calibrated Control")
+    plt.title(f"VTarget Voltage vs Calibrated Control - {board_id}")
     plt.xlim(0, 100)
     plt.grid(True, alpha=0.3)
     plt.legend()
@@ -136,17 +151,67 @@ def save_plot(results):
     print(f"  Graph saved to: {output_path}")
 
 
-def save_csv(results):
+def save_csv(results, board_id, tolerance_pct):
     output_dir = Path(__file__).resolve().parent / "test_results"
     output_dir.mkdir(exist_ok=True)
-    output_path = output_dir / "vtarget_pwm_dmm_measurements.csv"
+    output_path = output_dir / f"{output_stem(board_id)}_measurements.csv"
 
     with output_path.open("w", newline="") as csv_file:
         writer = csv.writer(csv_file)
-        writer.writerow(["duty_percent", "commanded_mv", "duty_count", "adc_mv", "dmm_mv", "diff_mv"])
+        writer.writerow([
+            "board_id", "duty_percent", "commanded_mv", "duty_count", "adc_mv",
+            "dmm_mv", "diff_mv", "error_pct", "result",
+        ])
         for pct, mv, adc_mv, dmm_mv, diff in results:
-            writer.writerow([pct, mv, mv_to_fw_duty_count(mv), adc_mv, f"{dmm_mv:.1f}", f"{diff:.1f}"])
+            error_pct = (dmm_mv - mv) / mv * 100
+            passed = abs(error_pct) <= tolerance_pct
+            writer.writerow([
+                board_id, pct, mv, mv_to_fw_duty_count(mv), adc_mv,
+                f"{dmm_mv:.1f}", f"{diff:.1f}", f"{error_pct:.3f}",
+                "PASS" if passed else "FAIL",
+            ])
     print(f"  CSV saved to: {output_path}")
+    return output_path
+
+
+def append_summary(board_id, results, tolerance_pct):
+    output_dir = Path(__file__).resolve().parent / "test_results"
+    output_path = output_dir / "vtarget_production_summary.csv"
+    error_percentages = [(result[3] - result[1]) / result[1] * 100 for result in results]
+    failed_points = sum(abs(error_pct) > tolerance_pct for error_pct in error_percentages)
+    dmm_values = [result[3] for result in results]
+    adc_dmm_diffs = [abs(result[4]) for result in results]
+    fieldnames = [
+        "timestamp", "board_id", "points", "tolerance_pct", "failed_points",
+        "worst_error_pct", "min_dmm_mv", "max_dmm_mv", "max_adc_dmm_diff_mv",
+        "average_adc_dmm_diff_mv", "result",
+    ]
+    existing_rows = []
+    if output_path.exists():
+        with output_path.open(newline="") as csv_file:
+            existing_rows = [row for row in csv.DictReader(csv_file) if row["board_id"] != board_id]
+
+    summary_row = {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "board_id": board_id,
+        "points": len(results),
+        "tolerance_pct": f"{tolerance_pct:.2f}",
+        "failed_points": failed_points,
+        "worst_error_pct": f"{max(abs(error_pct) for error_pct in error_percentages):.3f}",
+        "min_dmm_mv": f"{min(dmm_values):.1f}",
+        "max_dmm_mv": f"{max(dmm_values):.1f}",
+        "max_adc_dmm_diff_mv": f"{max(adc_dmm_diffs):.1f}",
+        "average_adc_dmm_diff_mv": f"{sum(adc_dmm_diffs) / len(adc_dmm_diffs):.1f}",
+        "result": "PASS" if failed_points == 0 else "FAIL",
+    }
+    existing_rows.append(summary_row)
+
+    with output_path.open("w", newline="") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(fieldnames)
+        writer.writerows([[row[field] for field in fieldnames] for row in existing_rows])
+    print(f"  Production summary saved to: {output_path}")
+    return failed_points
 
 
 def main():
@@ -155,6 +220,10 @@ def main():
     ap.add_argument("--vb",    default=DEFAULT_VB)
     ap.add_argument("--settle", type=float, default=0.4,
                     help="Settle time after PWM change (s)")
+    ap.add_argument("--board-id", required=True,
+                    help="Unique identifier printed on the PCB under test")
+    ap.add_argument("--tolerance-pct", type=float, default=5.0,
+                    help="Maximum allowed DMM error percentage (default: 5.0)")
     args = ap.parse_args()
 
     steps = list(range(0, 101))
@@ -162,6 +231,8 @@ def main():
     print("PWM sweep + simultaneous DAP ADC & DMM measurement")
     print(f"  Device      : {args.ip}:{USBIP_PORT}")
     print(f"  VirtualBench: {args.vb}")
+    print(f"  Board ID    : {args.board_id}")
+    print(f"  Tolerance   : +/-{args.tolerance_pct:.1f}% DMM error")
     print(f"  Wiring      : VTarget output shorted to VTref (GPIO2 ADC)")
     print(f"  DMM probes  : V terminal on VTarget pad, COM on GND")
     print("  Sweep       : 0% to 100% calibrated VTarget range in 1% increments")
@@ -214,16 +285,21 @@ def main():
     # Summary
     if results:
         diffs = [abs(r[4]) for r in results]
+        error_percentages = [(r[3] - r[1]) / r[1] * 100 for r in results]
+        failed_points = sum(abs(error_pct) > args.tolerance_pct for error_pct in error_percentages)
         print(f"\n  ADC vs DMM: max diff {max(diffs):.0f} mV, avg diff {sum(diffs)/len(diffs):.0f} mV")
         dmm_vals = [r[3] for r in results]
         print(f"  DMM range : {min(dmm_vals):.0f} mV .. {max(dmm_vals):.0f} mV")
+        print(f"  DMM tolerance: {len(results) - failed_points}/{len(results)} points passed")
         if max(dmm_vals) - min(dmm_vals) < 50:
             print("  NOTE: VTarget not responding to PWM - LDO fixed output or dropout")
         else:
             print("  PWM voltage control is working!")
-        save_plot(results)
-        save_csv(results)
-    return 0
+        save_plot(results, args.board_id)
+        save_csv(results, args.board_id, args.tolerance_pct)
+        append_summary(args.board_id, results, args.tolerance_pct)
+        return 0 if failed_points == 0 else 1
+    return 1
 
 
 if __name__ == "__main__":

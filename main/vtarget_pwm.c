@@ -29,25 +29,30 @@ static const char *TAG = "vtarget_pwm";
 #define VTARGET_PWM_RESOLUTION  LEDC_TIMER_10_BIT // 10-bit (0-1023)
 #define VTARGET_PWM_MAX_DUTY    ((1 << 10) - 1)  // 1023
 
-// Calibration curve measured with the VirtualBench DMM (2026-08-31), duty
-// ascending / voltage descending. Replaces a two-point linear guess because
-// the Q1/AP1117 feedback response is nonlinear across the duty range.
+// Calibration curve measured with the VirtualBench DMM (2026-09-08), duty
+// ascending / voltage descending. This is the median response of the
+// PCB-04/PCB-08/PCB-09/PCB-10 cluster, the only group of measured boards
+// whose curves agreed closely enough (worst 1.9%, mean 0.5% vs +/-5% target)
+// to share one table. See circuit_ESP32C3_Xiao/documentations/
+// VTARGET_BATCH_ANALYSIS.md for the full batch comparison and root-cause
+// notes. PCB-01, PCB-02, PCB-05, PCB-06, PCB-03, and PCB-07 do NOT fit this
+// table within +/-5% and need their own calibration if used.
 typedef struct {
     uint16_t duty;
     uint16_t voltage_mv;
 } vtarget_cal_point_t;
 
 static const vtarget_cal_point_t VTARGET_CAL_TABLE[] = {
-    { 358, 4206 }, { 389, 4197 }, { 420, 4183 }, { 451, 4166 }, { 482, 4131 },
-    { 514, 4080 }, { 545, 4006 }, { 576, 3902 }, { 607, 3757 }, { 638, 3569 },
-    { 670, 3312 }, { 701, 3012 }, { 732, 2654 }, { 763, 2269 }, { 794, 1892 },
-    { 826, 1569 }, { 857, 1396 }, { 888, 1357 }, { 919, 1343 }, { 950, 1329 },
-    { 982, 1326 },
+    { 358, 4200 }, { 559, 4072 }, { 612, 3943 }, { 647, 3811 }, { 678, 3650 },
+    { 699, 3514 }, { 716, 3385 }, { 732, 3250 }, { 747, 3110 }, { 763, 2945 },
+    { 775, 2813 }, { 787, 2674 }, { 797, 2552 }, { 808, 2418 }, { 819, 2281 },
+    { 831, 2132 }, { 841, 2010 }, { 851, 1892 }, { 862, 1772 }, { 872, 1673 },
+    { 883, 1575 }, { 898, 1465 }, { 912, 1397 }, { 929, 1361 }, { 982, 1326 },
 };
 #define VTARGET_CAL_POINTS (sizeof(VTARGET_CAL_TABLE) / sizeof(VTARGET_CAL_TABLE[0]))
 
 #define VTARGET_MIN_VOLTAGE_MV  1326   // VTARGET_CAL_TABLE last entry
-#define VTARGET_MAX_VOLTAGE_MV  4206   // VTARGET_CAL_TABLE first entry
+#define VTARGET_MAX_VOLTAGE_MV  4200   // VTARGET_CAL_TABLE first entry
 
 /**
  * @brief Map a requested voltage to a PWM duty using the calibration table
@@ -153,7 +158,7 @@ esp_err_t vtarget_pwm_init(void)
  * Looks up the requested voltage in VTARGET_CAL_TABLE and interpolates
  * between the two nearest measured points to find the PWM duty cycle.
  * 
- * @param voltage_mv Target voltage in millivolts (1326 to 4206)
+ * @param voltage_mv Target voltage in millivolts (1326 to 4200)
  * @return ESP_OK on success, ESP_ERR_INVALID_ARG if out of range
  */
 esp_err_t vtarget_set_voltage(uint16_t voltage_mv)
