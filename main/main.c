@@ -88,6 +88,10 @@ static void print_help(void) {
     ESP_LOGI(DBG_TAG, "  v      - Read VTref voltage");
     ESP_LOGI(DBG_TAG, "  s      - Print full status");
     ESP_LOGI(DBG_TAG, "  h / ?  - Print this help");
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
+    ESP_LOGI(DBG_TAG, "  board          - Show VTarget calibration table and range");
+    ESP_LOGI(DBG_TAG, "  board <name>   - Select table (cluster, pcb-01 ... pcb-10), stored in NVS");
+#endif
     ESP_LOGI(DBG_TAG, "  reboot - Reboot device (full word required)");
     ESP_LOGI(DBG_TAG, "===========================");
 }
@@ -151,6 +155,20 @@ static void debug_task(void *arg) {
                 print_debug_status();
             } else if (line_len == 1 && (line[0] == 'h' || line[0] == '?')) {
                 print_help();
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
+            } else if (strcmp(line, "board") == 0 || strncmp(line, "board ", 6) == 0) {
+                if (line_len > 6) {
+                    esp_err_t err = vtarget_set_board(&line[6]);
+                    if (err == ESP_ERR_NOT_FOUND)
+                        ESP_LOGW(DBG_TAG, "Unknown board '%s' (cluster, pcb-01 ... pcb-10)", &line[6]);
+                    else if (err != ESP_OK)
+                        ESP_LOGW(DBG_TAG, "Setting board failed: %s", esp_err_to_name(err));
+                }
+                uint16_t lo = 0, hi = 0;
+                vtarget_get_range(&lo, &hi);
+                ESP_LOGI(DBG_TAG, "VTarget table: %s  range %u-%u mV  settle wait: %"PRIu32" ms",
+                         vtarget_get_board(), lo, hi, vtarget_settle_remaining_ms());
+#endif
             } else if (strcmp(line, "reboot") == 0) {
                 ESP_LOGW(DBG_TAG, "Rebooting...");
                 vTaskDelay(pdMS_TO_TICKS(200));

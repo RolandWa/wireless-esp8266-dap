@@ -23,7 +23,11 @@
 #define VTARGET_PWM_H
 
 #include "esp_err.h"
+#include "vtarget_cal.h"
 #include <stdint.h>
+
+/** Maximum board name length including NUL (e.g. "PCB-05", "CLUSTER"). */
+#define VTARGET_BOARD_NAME_MAX VTARGET_CAL_NAME_MAX
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,20 +57,57 @@ esp_err_t vtarget_pwm_init(void);
  * MOSFET/AP1117-ADJ feedback response is not linear across the range.
  * 
  * Voltage Control:
- * - Interpolated between 25 DMM-measured (duty, voltage) points
- * - PWM count 358 → approximately 4.200V output
- * - PWM count 982 → approximately 1.326V output
- * 
- * Note: this table is the median PCB-04/08/09/10 cluster response.
- * Recalibrate VTARGET_CAL_TABLE in vtarget_pwm.c if hardware changes
- * (resistor values, MOSFET part, load current), and confirm any other
- * board fits it within +/-5% before relying on it. See
+ * - Interpolated between DMM-measured (duty, voltage) points of the active
+ *   calibration table (see vtarget_cal.h)
+ * - Default table CLUSTER: PWM count 358 → ~4.200V, 982 → ~1.326V
+ * - Per-board tables (PCB-01 ... PCB-10) are selected with vtarget_set_board()
+ *
+ * Note: CLUSTER is the median PCB-04/08/09/10 response. Other boards are
+ * within +/-5% only with their own table. Recalibrate (and regenerate
+ * vtarget_cal_boards.c) if hardware changes (resistor values, MOSFET part,
+ * load current). See
  * circuit_ESP32C3_Xiao/documentations/VTARGET_BATCH_ANALYSIS.md.
- * 
- * @param voltage_mv Target voltage in millivolts (1326 to 4200)
+ *
+ * The output needs ~VTARGET_SETTLE_MS to settle after each change (gate filter
+ * tau ~ 145 ms); use vtarget_settle_remaining_ms() before trusting a reading.
+ *
+ * @param voltage_mv Target voltage in millivolts (within vtarget_get_range())
  * @return ESP_OK on success, ESP_ERR_INVALID_ARG if out of range
  */
 esp_err_t vtarget_set_voltage(uint16_t voltage_mv);
+
+/**
+ * @brief Name of the calibration table in use ("CLUSTER" or "PCB-xx")
+ */
+const char *vtarget_get_board(void);
+
+/**
+ * @brief Select the calibration table for this board and persist it in NVS
+ *
+ * Re-applies the last requested voltage (clamped to the new table's range).
+ *
+ * @param name "CLUSTER" or "PCB-xx" (case-insensitive)
+ * @return ESP_OK, ESP_ERR_NOT_FOUND for an unknown name, or an NVS/LEDC error
+ */
+esp_err_t vtarget_set_board(const char *name);
+
+/**
+ * @brief Voltage range accepted by vtarget_set_voltage() for the active table
+ * @param min_mv Receives the lowest voltage (may be NULL)
+ * @param max_mv Receives the highest voltage (may be NULL)
+ */
+void vtarget_get_range(uint16_t *min_mv, uint16_t *max_mv);
+
+/**
+ * @brief Last voltage requested via vtarget_set_voltage(), 0 if none/raw duty
+ */
+uint16_t vtarget_get_requested_mv(void);
+
+/**
+ * @brief Milliseconds until the output has settled after the last change
+ * @return 0 when settled
+ */
+uint32_t vtarget_settle_remaining_ms(void);
 
 /**
  * @brief Set raw PWM duty cycle

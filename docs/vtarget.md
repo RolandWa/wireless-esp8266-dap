@@ -86,6 +86,37 @@ At boot: `vtarget_pwm_init()` is called and the default is set to 3300 mV.
 | Status 0x01 | Invalid range (outside 1326–4200 mV) |
 | Status 0xFF | Not supported on this target (non-C3/S3 build) |
 
+The valid range is that of the **active calibration table** (default `CLUSTER`:
+1326–4200 mV; see [Per-board calibration](#per-board-calibration)). The output
+needs about 1 s to settle after every change (gate filter τ ≈ 145 ms).
+
+### Vendor3 (0x83) — VTarget info
+
+| Field | Detail |
+| ----- | ------ |
+| Command ID | `0x83` (`ID_DAP_Vendor3`) |
+| Request | `[0x83]` + zero padding |
+| Response | `[0x83, flags, min_lo, min_hi, max_lo, max_hi, req_lo, req_hi, settle_lo, settle_hi, name_len, name...]` |
+| flags | bit0 = output settled, bit7 = VTarget control not supported on this target |
+| min / max | lowest / highest mV of the active table (little-endian) |
+| req | last mV requested via Vendor2, 0 = none |
+| settle | ms still to wait for the output to settle (0 = settled, saturates at 65535) |
+| name | active calibration table, e.g. `CLUSTER`, `PCB-05` (`name_len` ≤ 15) |
+
+Firmware without Vendor3 answers with the single byte `0x83`; clients should fall
+back to a fixed ≥ 1 s wait (`tests/read_vtarget_tcp.py` does).
+
+### Vendor4 (0x84) — Select calibration table
+
+| Field | Detail |
+| ----- | ------ |
+| Command ID | `0x84` (`ID_DAP_Vendor4`) |
+| Request | `[0x84, name_len, name...]`, `name_len` 1–15, e.g. `PCB-05` or `CLUSTER` (case-insensitive) |
+| Response | `[0x84, status]` |
+| Status 0x00 | OK — table stored in NVS (survives reboot), last request re-applied |
+| Status 0x01 | Unknown board or bad name length |
+| Status 0xFF | Other error (NVS) or not supported on this target |
+
 ### Serial debug commands (115200 baud, COM12)
 
 Commands are line-based — type the command and press **Enter**.
@@ -94,6 +125,8 @@ Commands are line-based — type the command and press **Enter**.
 | ------- | ------ |
 | `v` | Read VTref voltage once |
 | `s` | Print status: IP, RSSI, VTref, free heap |
+| `board` | Show the calibration table in use, its range and the remaining settle time |
+| `board <name>` | Select a table (`cluster`, `pcb-01` … `pcb-10`), stored in NVS |
 | `h` / `?` | Print help |
 | `reboot` | Reboot the device (full word required - prevents accidental trigger from stale bytes) |
 
@@ -106,10 +139,57 @@ void     vtarget_log_boot_reading(void);      // called once at startup
 
 // main/vtarget_pwm.h
 esp_err_t vtarget_pwm_init(void);             // call once at boot (main.c does this)
-esp_err_t vtarget_set_voltage(uint16_t mV);  // 1326-4200 mV, calibration-table interpolated
+esp_err_t vtarget_set_voltage(uint16_t mV);  // range of the active table, interpolated
 esp_err_t vtarget_set_duty_raw(uint16_t d);  // 0-1023, for calibration
 uint16_t  vtarget_get_duty_raw(void);
+esp_err_t vtarget_set_board(const char *name);   // select + store calibration table (NVS)
+const char *vtarget_get_board(void);             // "CLUSTER" or "PCB-xx"
+void      vtarget_get_range(uint16_t *min_mv, uint16_t *max_mv);
+uint16_t  vtarget_get_requested_mv(void);        // 0 = none / raw duty
+uint32_t  vtarget_settle_remaining_ms(void);     // 0 = settled
 ```
+
+---
+
+## Per-board calibration
+
+The Q1/AP1117 response differs from board to board (tolerances, C2 part), so the
+requested voltage is mapped to a PWM duty through a **per-board table**. Pure C
+logic in `main/vtarget_cal.c` (host unit-tested); data in
+`main/vtarget_cal.c` (`CLUSTER`, the median of PCB-04/08/09/10, the default) and
+`main/vtarget_cal_boards.c` (`PCB-01` … `PCB-10`, generated from the DMM sweeps in
+`tests/test_results/vtarget_PCB-xx_measurements.csv`).
+
+| Task | How |
+| ---- | --- |
+| Select a table | serial `board pcb-05`, or `python tests/read_vtarget_tcp.py --board PCB-05` (Vendor4); stored in NVS |
+| See what is active | serial `board`, or `python tests/read_vtarget_tcp.py --info` (Vendor3) |
+| Re-measure a board | `python tests/pwm_vtarget_dmm.py --board-id PCB-xx` (use `--settle 1.0`) |
+| Regenerate the tables | `python circuit_ESP32C3_Xiao/scripts/generate_vtarget_cal_boards.py` (`--check` verifies the committed file) |
+
+Each board's valid range is that of its table (e.g. PCB-07 only reaches
+≈ 1.88–4.20 V). The sweeps were taken with 0.4 s settling per point, so the
+tables carry that settling bias until the boards are re-measured with a longer
+settle time. Which table belongs to which physical board is not stored anywhere
+yet — select it once per board after flashing.
+
+## TCP keepalive
+
+The USBIP/elaphureLink socket on port 3240 uses TCP keepalive with 5 s idle,
+2 s interval and 3 probes (`main/tcp_server.c`), so a client that vanished
+(e.g. a Windows PC that went to sleep) is detected after about 11 s instead of the
+2 h default and the single connection slot is released.
+
+## Unit tests
+
+```bat
+python -m pytest tests/unit -v          # Python + builds/runs the C tests (gcc or WSL)
+wsl make -C tests/unit test             # the C tests only
+```
+
+They cover table lookup/validity/monotonicity, interpolation, range checks,
+settling, the Vendor3 encoding, the generator, and that the Python mirrors match
+the firmware table.
 
 ---
 
@@ -270,7 +350,11 @@ the old connection automatically when a new one arrives.
 | File | Role |
 | ---- | ---- |
 | `components/DAP/source/DAP_vendor.c` | ADC init, `vtarget_read_mv()`, Vendor1 + Vendor2 handlers |
-| `main/vtarget_pwm.c` | `vtarget_set_voltage()` — PWM control via LEDC (ESP32-C3/S3 only) |
+| `main/vtarget_pwm.c` | `vtarget_set_voltage()` — PWM control via LEDC, active table (NVS), settle tracking (ESP32-C3/S3 only) |
+| `main/vtarget_cal.c/.h` | Pure-C calibration logic: table lookup, interpolation, range, settling, Vendor3 encoding (host unit-tested) |
+| `main/vtarget_cal_boards.c` | Generated per-board tables `PCB-01` … `PCB-10` |
+| `circuit_ESP32C3_Xiao/scripts/generate_vtarget_cal_boards.py` | Generator for `vtarget_cal_boards.c` from the DMM sweeps |
+| `tests/unit/` | Unit tests (C + pytest) |
 | `main/vtarget_pwm.h` | Public API + convenience macros (`VTARGET_SET_3V3()` etc.) |
 | `main/DAP_handle.c` | DAP thread, ringbuf, `fast_reply()` — routes processed commands back to host |
 | `main/usbip_server.c` | TCP USBIP server — demultiplexes URBs to EP handlers |

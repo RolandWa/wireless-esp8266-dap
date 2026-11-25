@@ -312,6 +312,8 @@ the table if R4/R5/C2 or Q1 change.
 - [ ] **Flash a real MAX32672 binary** — test `flash_max32672.bat firmware.bin` end-to-end (erase + program + verify + reset); no flash binary currently available
 - [ ] **COM port loopback (USB Serial)** — test COM11 (FTDI) UART loopback on MAX32672 side; requires UART loopback firmware on MAX32672 or external wiring
 - [ ] **UART bridge baud-rate persistence fix** — after `--all-bauds` run, UART stays at last switched rate until reboot; firmware should reset baud to default on TCP disconnect
+- [ ] **Hardware check: TCP keepalive tuning** — implemented in `main/tcp_server.c` (5 s idle / 2 s interval / 3 probes, ~11 s), build-verified only. Verify on the board: connect a client, kill it hard (or disconnect the PC from WiFi) and confirm a new client can connect after ~11 s.
+- [ ] **Hardware check: per-board VTarget calibration** — implemented (`main/vtarget_cal*.c`, Vendor3/Vendor4, serial `board`), unit-tested and build-verified only. Per board: flash, select the table (`python tests/read_vtarget_tcp.py --board PCB-xx --info`), run `python tests/pwm_vtarget_dmm.py --board-id PCB-xx --settle 1.0` and confirm ≥ 95/101 points within ±5 %. The shipped tables come from the 0.4 s-settle sweeps, so re-measure with `--settle 1.0` and regenerate (`generate_vtarget_cal_boards.py`) if the fit is off.
 - [ ] **SWO trace** — `handle_swo_trace_response` currently stubbed out; implement and test SWO capture via USB/TCP
 - [ ] **Flash verify after program** — confirm `verify` step in `flash_max32672.bat` passes on a real write
 

@@ -1,9 +1,9 @@
 /**
  * @file vtarget_pwm.c
  * @brief Programmable VTarget voltage control using PWM on GPIO3
- * 
- * Controls AP1117-ADJ output voltage (calibrated range 1.326V to 4.200V) via
- * PWM-controlled MOSFET in the feedback divider network.
+ *
+ * Controls AP1117-ADJ output voltage (calibrated range 1.326V to 4.200V on the
+ * default table) via PWM-controlled MOSFET in the feedback divider network.
  *
  * Circuit topology (values from the KiCad schematic, fitted on all PCBs):
  * - GPIO3 PWM → R4 (22k) → Q1 (YJL2304A MOSFET) Gate
@@ -13,12 +13,20 @@
  * - AP1117-ADJ feedback divider R1 (1.2k) / R3 (2.7k) + Q1 drain-source
  * - R6/R7 (100k each) form the VTref sense divider to GPIO2 (ADC)
  * - C3 (10uF) output capacitor on VTarget
+ *
+ * Voltage → duty mapping is done by vtarget_cal.c (pure C, unit-tested on the
+ * host). Each measured PCB has its own table; the table in use is stored in
+ * NVS (namespace "vtarget", key "board") and defaults to CLUSTER.
  */
 
 #include "vtarget_pwm.h"
+#include "vtarget_cal.h"
 #include "driver/ledc.h"
 #include "esp_log.h"
 #include "esp_idf_version.h"
+#include "esp_timer.h"
+#include "nvs.h"
+#include <string.h>
 
 static const char *TAG = "vtarget_pwm";
 
@@ -31,75 +39,85 @@ static const char *TAG = "vtarget_pwm";
 #define VTARGET_PWM_RESOLUTION  LEDC_TIMER_10_BIT // 10-bit (0-1023)
 #define VTARGET_PWM_MAX_DUTY    ((1 << 10) - 1)  // 1023
 
-// Calibration curve measured with the VirtualBench DMM (2026-09-08), duty
-// ascending / voltage descending. This is the median response of the
-// PCB-04/PCB-08/PCB-09/PCB-10 cluster, the only group of measured boards
-// whose curves agreed closely enough (worst 1.9%, mean 0.5% vs +/-5% target)
-// to share one table. See circuit_ESP32C3_Xiao/documentations/
-// VTARGET_BATCH_ANALYSIS.md for the full batch comparison and root-cause
-// notes. PCB-01, PCB-02, PCB-05, PCB-06, PCB-03, and PCB-07 do NOT fit this
-// table within +/-5% and need their own calibration if used.
-typedef struct {
-    uint16_t duty;
-    uint16_t voltage_mv;
-} vtarget_cal_point_t;
+#define VTARGET_NVS_NAMESPACE   "vtarget"
+#define VTARGET_NVS_KEY_BOARD   "board"
 
-static const vtarget_cal_point_t VTARGET_CAL_TABLE[] = {
-    { 358, 4200 }, { 559, 4072 }, { 612, 3943 }, { 647, 3811 }, { 678, 3650 },
-    { 699, 3514 }, { 716, 3385 }, { 732, 3250 }, { 747, 3110 }, { 763, 2945 },
-    { 775, 2813 }, { 787, 2674 }, { 797, 2552 }, { 808, 2418 }, { 819, 2281 },
-    { 831, 2132 }, { 841, 2010 }, { 851, 1892 }, { 862, 1772 }, { 872, 1673 },
-    { 883, 1575 }, { 898, 1465 }, { 912, 1397 }, { 929, 1361 }, { 982, 1326 },
-};
-#define VTARGET_CAL_POINTS (sizeof(VTARGET_CAL_TABLE) / sizeof(VTARGET_CAL_TABLE[0]))
+// Active calibration table, last request and time of the last duty change
+static const vtarget_cal_table_t *s_table = NULL;
+static uint16_t s_requested_mv = 0;   // 0 = nothing requested via vtarget_set_voltage yet
+static int64_t s_last_change_us = 0;
 
-#define VTARGET_MIN_VOLTAGE_MV  1326   // VTARGET_CAL_TABLE last entry
-#define VTARGET_MAX_VOLTAGE_MV  4200   // VTARGET_CAL_TABLE first entry
-
-/**
- * @brief Map a requested voltage to a PWM duty using the calibration table
- *
- * Performs piecewise-linear interpolation between the two bracketing
- * measured points instead of assuming a straight line across the full range.
- */
-static uint32_t vtarget_interp_duty(uint16_t voltage_mv)
+static const vtarget_cal_table_t *active_table(void)
 {
-    size_t last = VTARGET_CAL_POINTS - 1;
-
-    if (voltage_mv >= VTARGET_CAL_TABLE[0].voltage_mv) {
-        return VTARGET_CAL_TABLE[0].duty;
+    if (s_table == NULL) {
+        s_table = vtarget_cal_default();
     }
-    if (voltage_mv <= VTARGET_CAL_TABLE[last].voltage_mv) {
-        return VTARGET_CAL_TABLE[last].duty;
-    }
+    return s_table;
+}
 
-    for (size_t i = 0; i < last; i++) {
-        uint16_t v_hi = VTARGET_CAL_TABLE[i].voltage_mv;
-        uint16_t v_lo = VTARGET_CAL_TABLE[i + 1].voltage_mv;
-        if (voltage_mv <= v_hi && voltage_mv >= v_lo) {
-            uint16_t duty_lo = VTARGET_CAL_TABLE[i].duty;
-            uint16_t duty_hi = VTARGET_CAL_TABLE[i + 1].duty;
-            uint32_t span_v = v_hi - v_lo;
-            uint32_t offset_v = v_hi - voltage_mv;
-            return duty_lo + ((uint32_t)(duty_hi - duty_lo) * offset_v) / span_v;
+static void mark_changed(void)
+{
+    s_last_change_us = esp_timer_get_time();
+}
+
+/** Read the stored board name from NVS into the active table (CLUSTER if unset/unknown). */
+static void load_board_from_nvs(void)
+{
+    s_table = vtarget_cal_default();
+
+    nvs_handle_t h;
+    if (nvs_open(VTARGET_NVS_NAMESPACE, NVS_READONLY, &h) != ESP_OK) {
+        return;   // namespace not created yet: default table
+    }
+    char name[VTARGET_CAL_NAME_MAX];
+    size_t len = sizeof(name);
+    if (nvs_get_str(h, VTARGET_NVS_KEY_BOARD, name, &len) == ESP_OK) {
+        const vtarget_cal_table_t *t = vtarget_cal_find(name);
+        if (t != NULL) {
+            s_table = t;
+        } else {
+            ESP_LOGW(TAG, "Stored board '%s' has no calibration table, using %s",
+                     name, s_table->name);
         }
     }
+    nvs_close(h);
+}
 
-    return VTARGET_CAL_TABLE[last].duty;
+static esp_err_t apply_duty(uint32_t duty_cycle)
+{
+    esp_err_t ret = ledc_set_duty(VTARGET_PWM_MODE, VTARGET_PWM_CHANNEL, duty_cycle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set duty cycle: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ret = ledc_update_duty(VTARGET_PWM_MODE, VTARGET_PWM_CHANNEL);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to update duty: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    mark_changed();
+    return ESP_OK;
 }
 
 /**
  * @brief Initialize PWM for VTarget voltage control
- * 
+ *
  * Configures GPIO3 as PWM output at 1 kHz with 10-bit resolution.
  * The PWM signal controls a MOSFET in the AP1117-ADJ feedback network
- * to adjust the output voltage over the calibrated 1.326V to 4.200V range.
- * 
+ * to adjust the output voltage over the active table's calibrated range.
+ * Selects the calibration table stored in NVS (default CLUSTER).
+ *
  * @return ESP_OK on success, error code otherwise
  */
 esp_err_t vtarget_pwm_init(void)
 {
     esp_err_t ret;
+
+    load_board_from_nvs();
+    ESP_LOGI(TAG, "Calibration table: %s (%u-%u mV)", s_table->name,
+             vtarget_cal_min_mv(s_table), vtarget_cal_max_mv(s_table));
 
     // Configure LEDC timer
     ledc_timer_config_t timer_conf = {
@@ -136,15 +154,8 @@ esp_err_t vtarget_pwm_init(void)
     }
 
     // Set initial duty cycle to 0% (MOSFET OFF = max voltage, ~4.2V)
-    ret = ledc_set_duty(VTARGET_PWM_MODE, VTARGET_PWM_CHANNEL, 0);
+    ret = apply_duty(0);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set initial duty: %s", esp_err_to_name(ret));
-        return ret;
-    }
-
-    ret = ledc_update_duty(VTARGET_PWM_MODE, VTARGET_PWM_CHANNEL);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to update duty: %s", esp_err_to_name(ret));
         return ret;
     }
 
@@ -156,46 +167,43 @@ esp_err_t vtarget_pwm_init(void)
 
 /**
  * @brief Set VTarget voltage using PWM duty cycle
- * 
- * Looks up the requested voltage in VTARGET_CAL_TABLE and interpolates
- * between the two nearest measured points to find the PWM duty cycle.
- * 
- * @param voltage_mv Target voltage in millivolts (1326 to 4200)
+ *
+ * Looks up the requested voltage in the active calibration table and
+ * interpolates between the two nearest measured points to find the PWM duty
+ * cycle. The output needs ~VTARGET_SETTLE_MS to settle afterwards (see
+ * vtarget_settle_remaining_ms()).
+ *
+ * @param voltage_mv Target voltage in millivolts (within vtarget_get_range())
  * @return ESP_OK on success, ESP_ERR_INVALID_ARG if out of range
  */
 esp_err_t vtarget_set_voltage(uint16_t voltage_mv)
 {
+    const vtarget_cal_table_t *table = active_table();
+
     // Validate input range
-    if (voltage_mv < VTARGET_MIN_VOLTAGE_MV || voltage_mv > VTARGET_MAX_VOLTAGE_MV) {
-        ESP_LOGE(TAG, "Voltage %d mV out of range (%d-%d mV)",
-                 voltage_mv, VTARGET_MIN_VOLTAGE_MV, VTARGET_MAX_VOLTAGE_MV);
+    if (!vtarget_cal_in_range(table, voltage_mv)) {
+        ESP_LOGE(TAG, "Voltage %d mV out of range (%u-%u mV, table %s)",
+                 voltage_mv, vtarget_cal_min_mv(table), vtarget_cal_max_mv(table), table->name);
         return ESP_ERR_INVALID_ARG;
     }
 
-    uint32_t duty_cycle = vtarget_interp_duty(voltage_mv);
+    uint32_t duty_cycle = vtarget_cal_mv_to_duty(table, voltage_mv);
 
-    // Set the PWM duty cycle
-    esp_err_t ret = ledc_set_duty(VTARGET_PWM_MODE, VTARGET_PWM_CHANNEL, duty_cycle);
+    esp_err_t ret = apply_duty(duty_cycle);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set duty cycle: %s", esp_err_to_name(ret));
         return ret;
     }
+    s_requested_mv = voltage_mv;
 
-    ret = ledc_update_duty(VTARGET_PWM_MODE, VTARGET_PWM_CHANNEL);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to update duty: %s", esp_err_to_name(ret));
-        return ret;
-    }
-
-    ESP_LOGI(TAG, "VTarget set to %d mV (duty cycle: %u / %d)",
-             voltage_mv, (unsigned int)duty_cycle, VTARGET_PWM_MAX_DUTY);
+    ESP_LOGI(TAG, "VTarget set to %d mV (duty cycle: %u / %d, table %s)",
+             voltage_mv, (unsigned int)duty_cycle, VTARGET_PWM_MAX_DUTY, table->name);
 
     return ESP_OK;
 }
 
 /**
  * @brief Set raw PWM duty cycle (for calibration/testing)
- * 
+ *
  * @param duty_cycle Raw duty cycle value (0 to 1023)
  * @return ESP_OK on success, error code otherwise
  */
@@ -206,17 +214,11 @@ esp_err_t vtarget_set_duty_raw(uint16_t duty_cycle)
         return ESP_ERR_INVALID_ARG;
     }
 
-    esp_err_t ret = ledc_set_duty(VTARGET_PWM_MODE, VTARGET_PWM_CHANNEL, duty_cycle);
+    esp_err_t ret = apply_duty(duty_cycle);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set raw duty: %s", esp_err_to_name(ret));
         return ret;
     }
-
-    ret = ledc_update_duty(VTARGET_PWM_MODE, VTARGET_PWM_CHANNEL);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to update raw duty: %s", esp_err_to_name(ret));
-        return ret;
-    }
+    s_requested_mv = 0;   // no longer a calibrated request
 
     ESP_LOGI(TAG, "Raw duty cycle set: %d / %d", duty_cycle, VTARGET_PWM_MAX_DUTY);
     return ESP_OK;
@@ -224,7 +226,7 @@ esp_err_t vtarget_set_duty_raw(uint16_t duty_cycle)
 
 /**
  * @brief Get current PWM duty cycle
- * 
+ *
  * @return Current duty cycle value (0 to 1023)
  */
 uint16_t vtarget_get_duty_raw(void)
@@ -234,9 +236,9 @@ uint16_t vtarget_get_duty_raw(void)
 
 /**
  * @brief Disable VTarget PWM output
- * 
+ *
  * Sets duty to 0% (MOSFET OFF, maximum voltage output)
- * 
+ *
  * @return ESP_OK on success
  */
 esp_err_t vtarget_pwm_disable(void)
@@ -247,6 +249,85 @@ esp_err_t vtarget_pwm_disable(void)
         return ret;
     }
 
+    mark_changed();
+    s_requested_mv = 0;
     ESP_LOGI(TAG, "VTarget PWM disabled");
+    return ESP_OK;
+}
+
+const char *vtarget_get_board(void)
+{
+    return active_table()->name;
+}
+
+void vtarget_get_range(uint16_t *min_mv, uint16_t *max_mv)
+{
+    const vtarget_cal_table_t *table = active_table();
+    if (min_mv != NULL) {
+        *min_mv = vtarget_cal_min_mv(table);
+    }
+    if (max_mv != NULL) {
+        *max_mv = vtarget_cal_max_mv(table);
+    }
+}
+
+uint16_t vtarget_get_requested_mv(void)
+{
+    return s_requested_mv;
+}
+
+uint32_t vtarget_settle_remaining_ms(void)
+{
+    int64_t elapsed_us = esp_timer_get_time() - s_last_change_us;
+    uint32_t elapsed_ms = (elapsed_us < 0) ? 0 : (uint32_t)(elapsed_us / 1000);
+    return vtarget_cal_settle_remaining_ms(elapsed_ms, VTARGET_SETTLE_MS);
+}
+
+/**
+ * @brief Select the calibration table for this board and store it in NVS
+ *
+ * Re-applies the last requested voltage, clamped to the new table's range, so
+ * the output follows the new calibration immediately.
+ *
+ * @param name "CLUSTER" or a board id such as "PCB-05" (case-insensitive)
+ * @return ESP_OK, ESP_ERR_NOT_FOUND for an unknown name, or an NVS/LEDC error
+ */
+esp_err_t vtarget_set_board(const char *name)
+{
+    const vtarget_cal_table_t *table = vtarget_cal_find(name);
+    if (table == NULL) {
+        ESP_LOGE(TAG, "Unknown board '%s'", name ? name : "(null)");
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    nvs_handle_t h;
+    esp_err_t ret = nvs_open(VTARGET_NVS_NAMESPACE, NVS_READWRITE, &h);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "NVS open failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    ret = nvs_set_str(h, VTARGET_NVS_KEY_BOARD, table->name);
+    if (ret == ESP_OK) {
+        ret = nvs_commit(h);
+    }
+    nvs_close(h);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "NVS write failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    s_table = table;
+    ESP_LOGI(TAG, "Calibration table set to %s (%u-%u mV)", table->name,
+             vtarget_cal_min_mv(table), vtarget_cal_max_mv(table));
+
+    // Re-apply the last calibrated request on the new table (clamped to its range)
+    if (s_requested_mv != 0) {
+        uint16_t mv = s_requested_mv;
+        uint16_t lo = vtarget_cal_min_mv(table);
+        uint16_t hi = vtarget_cal_max_mv(table);
+        if (mv < lo) mv = lo;
+        if (mv > hi) mv = hi;
+        return vtarget_set_voltage(mv);
+    }
     return ESP_OK;
 }

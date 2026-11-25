@@ -254,6 +254,36 @@ pip install pyusb
 - Connect XIAO via USB
 - In Zadig, select "WinUSB" driver for the DAP device
 
+## Unit tests (no hardware)
+
+`tests/unit/` holds host-side tests for the VTarget calibration logic. They need no
+board, only Python with `pytest` and `gcc` + `make` (native, or inside WSL on Windows).
+
+```bash
+python -m pytest tests/unit -v      # from the repository root; also builds and runs the C tests
+make -C tests/unit test             # only the C tests (run in WSL on Windows)
+```
+
+Do not run `pytest tests/` — the other scripts in this folder need hardware.
+
+| File | What it covers |
+| ---- | -------------- |
+| `unit/test_vtarget_cal.c` | `main/vtarget_cal.c`: table lookup, validity, monotonicity, interpolation, range, settling, Vendor3 encoding, per-board tables vs the DMM sweeps |
+| `unit/test_cal_python_mirror.py` | Python copies of the calibration (`vtarget_cal.py`, `pwm_vtarget_dmm.py`) equal the firmware table; no script still uses the old 1250–5000 mV range |
+| `unit/test_generate_cal_boards.py` | table generator, and that `main/vtarget_cal_boards.c` is up to date with `test_results/*.csv` |
+| `unit/test_vtarget_protocol.py` | Vendor3/Vendor4 message helpers in `read_vtarget_tcp.py` (same byte vector as the C test) |
+| `unit/test_c_unit_tests.py` | builds and runs the C tests from pytest |
+
+### Per-board calibration helpers
+
+```bash
+python tests/read_vtarget_tcp.py --info                 # table in use, range, settling (Vendor3)
+python tests/read_vtarget_tcp.py --board PCB-05         # select the calibration table (Vendor4, stored in NVS)
+python tests/read_vtarget_tcp.py --board PCB-05 --set 3300 --info
+```
+
+`--set` waits for the output to settle (asks the firmware how long) before reading back.
+
 ## Running Tests
 
 ### USB Interface Test

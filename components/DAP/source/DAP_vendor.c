@@ -32,6 +32,7 @@
 #include "esp_err.h"
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 static const char *TAG = "DAP_vendor";
 
@@ -197,7 +198,7 @@ uint32_t DAP_ProcessVendorCommand(const uint8_t *request, uint8_t *response) {
 #endif
       break;
 
-    case ID_DAP_Vendor2:  // Set VTarget voltage (1326-4200 mV)
+    case ID_DAP_Vendor2:  // Set VTarget voltage (range of the active calibration table)
 #if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
       {
         num += 2U << 16;  // 2 bytes in request (voltage low, high)
@@ -212,8 +213,11 @@ uint32_t DAP_ProcessVendorCommand(const uint8_t *request, uint8_t *response) {
           *response++ = 0x00;  // Success
           ESP_LOGI(TAG, "VTarget set successfully to %d mV", voltage_mv);
         } else if (ret == ESP_ERR_INVALID_ARG) {
-          *response++ = 0x01;  // Invalid voltage range (not 1326-4200 mV)
-          ESP_LOGW(TAG, "Invalid voltage range: %d mV (valid: 1326-4200 mV)", voltage_mv);
+          uint16_t min_mv = 0, max_mv = 0;
+          vtarget_get_range(&min_mv, &max_mv);
+          *response++ = 0x01;  // Invalid voltage range (outside the active table's range)
+          ESP_LOGW(TAG, "Invalid voltage range: %d mV (valid: %d-%d mV, table %s)",
+                   voltage_mv, min_mv, max_mv, vtarget_get_board());
         } else {
           *response++ = 0xFF;  // Other error
           ESP_LOGE(TAG, "Failed to set VTarget: %s", esp_err_to_name(ret));
@@ -228,8 +232,73 @@ uint32_t DAP_ProcessVendorCommand(const uint8_t *request, uint8_t *response) {
       num += 1;
 #endif
       break;
-    case ID_DAP_Vendor3:  break;
-    case ID_DAP_Vendor4:  break;
+    case ID_DAP_Vendor3:  // VTarget info: range, last request, settling, calibration table
+      // Request:  [0x83]
+      // Response: [0x83, flags, min_lo, min_hi, max_lo, max_hi, req_lo, req_hi,
+      //            settle_ms_lo, settle_ms_hi, name_len, name...]
+      //   flags bit0 = 1: output settled (settle_ms = 0)
+      //   flags bit7 = 1: VTarget control not supported on this target
+      //   req = last mV requested via Vendor2 (0 = none)
+      //   settle_ms = milliseconds still to wait for the output to settle
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
+      {
+        vtarget_info_t info = {
+          .requested_mv = vtarget_get_requested_mv(),
+          .settle_ms = vtarget_settle_remaining_ms(),
+          .name = vtarget_get_board(),
+        };
+        vtarget_get_range(&info.min_mv, &info.max_mv);
+
+        size_t len = vtarget_cal_encode_info(response, VTARGET_INFO_MAX_LEN, &info);
+        response += len;
+        num += (uint32_t)len;
+      }
+#else
+      *response++ = 0x80;  // not supported
+      num += 1;
+#endif
+      break;
+
+    case ID_DAP_Vendor4:  // Select VTarget calibration table and store it in NVS
+      // Request:  [0x84, name_len, name...]   (name_len <= 15, e.g. "PCB-05" or "CLUSTER")
+      // Response: [0x84, status]  0x00 OK, 0x01 unknown board / bad length, 0xFF other error
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S3)
+      {
+        uint8_t name_len = *request++;
+        num += 1U << 16;                       // length byte
+        if (name_len == 0 || name_len >= VTARGET_BOARD_NAME_MAX) {
+          *response++ = 0x01;
+          num += 1;
+          break;
+        }
+        char name[VTARGET_BOARD_NAME_MAX];
+        memcpy(name, request, name_len);
+        name[name_len] = '\0';
+        num += (uint32_t)name_len << 16;       // name bytes
+
+        esp_err_t ret = vtarget_set_board(name);
+        if (ret == ESP_OK) {
+          *response++ = 0x00;
+          ESP_LOGI(TAG, "VTarget calibration table set to %s", vtarget_get_board());
+        } else if (ret == ESP_ERR_NOT_FOUND) {
+          *response++ = 0x01;
+          ESP_LOGW(TAG, "Unknown VTarget board '%s'", name);
+        } else {
+          *response++ = 0xFF;
+          ESP_LOGE(TAG, "Failed to set VTarget board: %s", esp_err_to_name(ret));
+        }
+        num += 1;
+      }
+#else
+      {
+        uint8_t name_len = *request++;          // consume the request, report not supported
+        num += 1U << 16;
+        num += (uint32_t)name_len << 16;
+        *response++ = 0xFF;
+        num += 1;
+      }
+#endif
+      break;
     case ID_DAP_Vendor5:  break;
     case ID_DAP_Vendor6:  break;
     case ID_DAP_Vendor7:  break;

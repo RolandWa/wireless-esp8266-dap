@@ -37,6 +37,12 @@ extern int kRestartDAPHandle;
 
 int kSock = -1;
 
+// TCP keepalive for the client socket: a probe after 5 s idle, then every 2 s,
+// connection dropped after 3 unanswered probes (~11 s to notice a dead client).
+#define TCP_KEEPALIVE_IDLE_S     5
+#define TCP_KEEPALIVE_INTERVAL_S 2
+#define TCP_KEEPALIVE_COUNT      3
+
 void tcp_server_task(void *pvParameters)
 {
     uint8_t tcp_rx_buffer[1500] = {0};
@@ -113,6 +119,16 @@ void tcp_server_task(void *pvParameters)
             }
             setsockopt(kSock, SOL_SOCKET, SO_KEEPALIVE, (void *)&on, sizeof(on));
             setsockopt(kSock, IPPROTO_TCP, TCP_NODELAY, (void *)&on, sizeof(on));
+#if defined(TCP_KEEPIDLE) && defined(TCP_KEEPINTVL) && defined(TCP_KEEPCNT)
+            // Detect dead peers (e.g. a Windows client that vanished) in about
+            // idle + intvl * cnt = 5 + 2 * 3 = 11 s instead of the 2 h default.
+            int keepidle = TCP_KEEPALIVE_IDLE_S;
+            int keepintvl = TCP_KEEPALIVE_INTERVAL_S;
+            int keepcnt = TCP_KEEPALIVE_COUNT;
+            setsockopt(kSock, IPPROTO_TCP, TCP_KEEPIDLE, (void *)&keepidle, sizeof(keepidle));
+            setsockopt(kSock, IPPROTO_TCP, TCP_KEEPINTVL, (void *)&keepintvl, sizeof(keepintvl));
+            setsockopt(kSock, IPPROTO_TCP, TCP_KEEPCNT, (void *)&keepcnt, sizeof(keepcnt));
+#endif
             os_printf("Socket accepted\r\n");
 
             // Read header
