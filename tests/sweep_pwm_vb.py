@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
-PWM duty cycle sweep: 1% to 100% in 5% steps.
-Sets duty via DAP Vendor2, measures actual waveform with VB-8034 mso/1.
+PWM duty cycle sweep over the duty window reachable through DAP Vendor2
+(PWM counts 358-982, i.e. ~35% to ~96%, the calibrated 4200-1326 mV range), in 5% steps.
+Sets duty via DAP Vendor2 (mV request mapped through the firmware calibration
+table, see vtarget_cal.py), measures actual waveform with VB-8034 mso/1.
 
 Usage:
     python tests/sweep_pwm_vb.py [--ip 192.168.137.123] [--vb VB8034-314E194] [--probe 10]
@@ -31,21 +33,8 @@ RESPONSE_CMD     = 0x00000003
 URB_FMT          = "!IIIIIIIIII8s"
 DIR_OUT, DIR_IN  = 0, 1
 
-# Firmware constants (must match vtarget_pwm.c)
-MAX_DUTY = 1023
-MIN_V_MV = 1250
-MAX_V_MV = 5000
-
-def duty_pct_to_mv(duty_pct):
-    """Convert desired duty % to the mV setpoint Vendor2 expects."""
-    duty_count = round(MAX_DUTY * duty_pct / 100.0)
-    duty_count = max(0, min(MAX_DUTY, duty_count))
-    if duty_count == 0:
-        return MAX_V_MV
-    if duty_count >= MAX_DUTY:
-        return MIN_V_MV
-    mv = round(MAX_V_MV - duty_count * (MAX_V_MV - MIN_V_MV) / MAX_DUTY)
-    return int(mv)
+# Firmware calibration (mirror of VTARGET_CAL_TABLE in vtarget_pwm.c)
+from vtarget_cal import MAX_DUTY, duty_pct_to_mv, mv_to_duty, reachable_duty_pct
 
 
 def recv_exact(sock, n):
@@ -162,7 +151,8 @@ def main():
                     help="Settle time after PWM change (s)")
     args = ap.parse_args()
 
-    steps = [1] + list(range(5, 101, 5))   # 1, 5, 10, 15, … 100
+    # Only duty values reachable via Vendor2 (358-982 counts, ~35%..~96%)
+    steps = [pct for pct in range(5, 101, 5) if reachable_duty_pct(pct)]   # 35, 40, … 95
 
     print(f"GPIO3 (A1) PWM sweep: {steps[0]}% to {steps[-1]}% in 5% steps")
     print(f"  Device      : {args.ip}:{USBIP_PORT}")
@@ -188,7 +178,7 @@ def main():
         results = []
         for target_pct in steps:
             mv         = duty_pct_to_mv(target_pct)
-            duty_count = round(MAX_DUTY * target_pct / 100.0)
+            duty_count = mv_to_duty(mv)   # duty the firmware will actually drive
 
             st, seq = dap_set_duty(sock, seq, mv)
             if st not in (0x00,):
@@ -210,7 +200,7 @@ def main():
 
         # Restore 3300 mV default
         dap_set_duty(sock, seq, 3300)
-        print(f"\n  Restored to 3300 mV (≈45% duty)")
+        print(f"\n  Restored to 3300 mV (≈71% duty)")
 
     scope.release()
     vb_dev.release()

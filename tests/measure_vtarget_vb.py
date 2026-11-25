@@ -5,7 +5,9 @@ Measure the VTarget output versus PWM duty cycle with an NI VirtualBench.
 Channel 1 (mso/1) is connected to the VTarget output. The script sets the
 corresponding VTarget control value through USBIP, acquires the Channel 1
 waveform with the internal niVB_MSO_ReadAnalog API, and calculates average,
-RMS, and peak-to-peak voltage for each duty-cycle point.
+RMS, and peak-to-peak voltage for each duty-cycle point. Only the duty window
+reachable through Vendor2 (calibrated 4200-1326 mV, ~35% to ~96%) is swept.
+Use --settle 1.0 or more: the gate filter needs ~0.5-1 s to settle.
 
 Usage:
     python tests/measure_vtarget_vb.py
@@ -41,22 +43,16 @@ URB_FMT = "!IIIIIIIIII8s"
 DIR_OUT, DIR_IN = 0, 1
 
 CMD_SET_VTARGET = 0x82
-MAX_DUTY = 1023
-MIN_VOLTAGE_MV = 1250
-MAX_VOLTAGE_MV = 5000
 
-
-def duty_percent_to_voltage_mv(duty_percent):
-    duty_count = round(MAX_DUTY * duty_percent / 100.0)
-    duty_count = max(0, min(MAX_DUTY, duty_count))
-    if duty_count == 0:
-        return MAX_VOLTAGE_MV
-    if duty_count >= MAX_DUTY:
-        return MIN_VOLTAGE_MV
-    return round(
-        MAX_VOLTAGE_MV
-        - duty_count * (MAX_VOLTAGE_MV - MIN_VOLTAGE_MV) / MAX_DUTY
-    )
+# Firmware calibration (mirror of VTARGET_CAL_TABLE in vtarget_pwm.c): Vendor2
+# accepts 1326-4200 mV, which maps to PWM counts 982-358 (~96% to ~35% duty).
+from vtarget_cal import (
+    DUTY_MAX_PCT,
+    DUTY_MIN_PCT,
+    MAX_DUTY,
+    duty_pct_to_mv as duty_percent_to_voltage_mv,
+    mv_to_duty,
+)
 
 
 def recv_exact(sock, size):
@@ -242,7 +238,7 @@ def save_plot(results, output_path):
     )
     axes[2].set_xlabel("PWM duty cycle (%)")
     axes[2].set_ylabel("Peak-to-peak (V)")
-    axes[2].set_xlim(0, 100)
+    axes[2].set_xlim(DUTY_MIN_PCT - 2, DUTY_MAX_PCT + 2)
     axes[2].grid(True, alpha=0.3)
     axes[2].legend()
 
@@ -266,12 +262,13 @@ def main():
     if not 0 < args.step <= 100:
         parser.error("--step must be greater than 0 and no greater than 100")
 
-    steps = []
-    duty = 0.0
-    while duty < 100.0:
+    # Sweep only the duty window reachable through Vendor2 (~35% to ~96%)
+    steps = [round(DUTY_MIN_PCT, 6)]
+    duty = DUTY_MIN_PCT + args.step
+    while duty < DUTY_MAX_PCT:
         steps.append(round(duty, 6))
         duty += args.step
-    steps.append(100.0)
+    steps.append(round(DUTY_MAX_PCT, 6))
 
     output_dir = Path(__file__).resolve().parent / "test_results"
     output_dir.mkdir(exist_ok=True)
@@ -301,7 +298,7 @@ def main():
             print("  " + "-" * 51)
             for duty_percent in steps:
                 commanded_mv = duty_percent_to_voltage_mv(duty_percent)
-                duty_count = round(MAX_DUTY * duty_percent / 100.0)
+                duty_count = mv_to_duty(commanded_mv)   # duty the firmware drives
                 sequence = set_vtarget(sock, sequence, commanded_mv)
                 time.sleep(args.settle)
 

@@ -23,14 +23,14 @@ Vendor1 (0x81) — Read VTarget:
 Vendor2 (0x82) — Set VTarget PWM (hardware TODO — circuit not yet complete):
     Request:  [0x82, voltage_low, voltage_high, <padding>]   (little-endian mV)
     Response: [0x82, status]
-    Status:   0x00=OK  0x01=out of range (valid: 1250-5000 mV)  0xFF=not supported
+    Status:   0x00=OK  0x01=out of range (valid: 1326-4200 mV)  0xFF=not supported
 
 USAGE
 -----
     python read_vtarget_tcp.py [--ip <esp32-ip>] [--set <mV>]
 
     Default IP: 192.168.137.123  (set in wifi_configuration.h)
-    --set <mV>: also send Vendor2 to set voltage (1250-5000)
+    --set <mV>: also send Vendor2 to set voltage (1326-4200)
 
 DEPENDENCIES
 ------------
@@ -69,7 +69,7 @@ URB_FMT = "!IIIIIIIIII8s"   # 48 bytes
 DIR_OUT = 0
 DIR_IN  = 1
 
-SET_STATUS = {0x00: "OK", 0x01: "invalid range (1250-5000 mV)", 0xFF: "not supported on this target"}
+SET_STATUS = {0x00: "OK", 0x01: "invalid range (1326-4200 mV)", 0xFF: "not supported on this target"}
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ def main() -> int:
     parser.add_argument("--ip", default=DEFAULT_IP,
                         help=f"ESP32 IP address (default: {DEFAULT_IP})")
     parser.add_argument("--set", type=int, metavar="MV",
-                        help="Set VTarget voltage in mV (1250-5000) via Vendor2 command")
+                        help="Set VTarget voltage in mV (1326-4200) via Vendor2 command")
     args = parser.parse_args()
 
     print(f"Connecting to {args.ip}:{USBIP_PORT} ...")

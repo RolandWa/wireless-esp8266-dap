@@ -7,13 +7,16 @@
  * 
  * Hardware Requirements:
  * - GPIO3: PWM output
- * - R4 (100R): Gate series resistor
+ * - R4 (22k): Gate series resistor
  * - R5 (43k): Gate pull-down
- * - C2 (10uF, 25V): PWM filter capacitor
+ * - C2 (10uF, 25V): PWM filter capacitor (tau ~ 145 ms; allow ~1 s to settle)
  * - Q1 (YJL2304A): N-channel MOSFET
  * - U2 (AP1117-ADJ): Adjustable LDO regulator
- * - R6, R7 (100k each): Feedback voltage divider
+ * - R1 (1.2k), R3 (2.7k): AP1117-ADJ feedback divider
+ * - R6, R7 (100k each): VTref sense divider to GPIO2 (ADC)
  * - C3 (10µF): Output capacitor
+ *
+ * Values are taken from the KiCad schematic and are fitted on all PCBs.
  */
 
 #ifndef VTARGET_PWM_H

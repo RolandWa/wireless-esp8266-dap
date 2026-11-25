@@ -34,12 +34,13 @@ URB_FMT           = "!IIIIIIIIII8s"
 DIR_OUT, DIR_IN   = 0, 1
 
 # Test points: (set_mv, expected_duty_pct, label)
-# duty = 1023 * (5000 - mv) / (5000 - 1250)
+# The firmware maps the mV request to a PWM duty through VTARGET_CAL_TABLE
+# (see vtarget_cal.py); only 1326-4200 mV (358-982 counts) is accepted.
 TEST_POINTS = [
-    (5000, 0.0,   "0% duty (max V)"),
-    (3300, 45.3,  "~45% duty (3.3V)"),
-    (2500, 66.7,  "~67% duty (2.5V)"),
-    (1250, 100.0, "100% duty (min V)"),
+    (4200, 35.0, "358/1023 = ~35% duty (max V)"),
+    (3300, 71.0, "~71% duty (3.3V)"),
+    (2500, 78.3, "~78% duty (2.5V)"),
+    (1326, 96.0, "982/1023 = ~96% duty (min V)"),
 ]
 
 
@@ -242,10 +243,8 @@ def main():
     print()
 
     # Summary
-    r0 = results[0]  # 0% duty
-    r3 = results[-1]  # 100% duty
-    if r0[2] < 5.0 and r3[2] > 95.0:
-        print("  PASS — PWM signal confirmed on GPIO3, full duty range verified")
+    if passed == len(results):
+        print("  PASS — PWM signal confirmed on GPIO3, calibrated duty range (~35%-96%) verified")
     elif any(r[3] is not None and 990 < r[3] < 1010 for r in results):
         print("  INFO — Frequency confirmed ~1 kHz; duty range may be limited by hardware")
     else:

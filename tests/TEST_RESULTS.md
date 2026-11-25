@@ -116,6 +116,10 @@
 
 ## 7. VTarget PWM Output Test
 
+> **Historical (superseded):** measured on early boards with the wrong LDO fitted
+> (AP1117-5). All boards now carry the **AP1117-ADJ** and the reworked VTarget
+> values from the KiCad schematic; see section 10 for current results.
+
 **Script:** `tests/test_vtarget_pwm.py`  
 **Wiring:** VTref (GPIO2) shorted to VTarget output  
 **Sweep:** 1250, 1800, 2500, 3000, 3300, 3600, 4096, 5000 mV  
@@ -188,11 +192,15 @@ Additionally, the AP1117-5 needs ≥ 6.3 V input to regulate to 5 V; running fro
 
 **LEDC PWM peripheral confirmed functional.** Duty cycle linearity is excellent across the full range with sub-0.2% error. Signal amplitude matches 3.3 V GPIO logic level throughout.
 
-> **Hardware note:** The PWM output on GPIO3 is correct. The VTarget voltage control does not respond because the assembled AP1117-5 (fixed 5 V, no ADJ pin) cannot be adjusted via the feedback network. Replacing with AP1117-ADJ will enable full VTarget control.
+> **Hardware note:** The PWM output on GPIO3 is correct. The VTarget voltage control did not respond on this early board because the assembled AP1117-5 (fixed 5 V, no ADJ pin) cannot be adjusted via the feedback network. *(Resolved: all boards now carry the AP1117-ADJ.)*
 
 ---
 
 ## 9. VTarget PWM + DMM Cross-Check
+
+> **Historical (superseded):** measured with an AP1117-3.3 fitted instead of the
+> AP1117-ADJ. The ADC-vs-DMM agreement result (±13 mV) is still valid; the
+> "no response to PWM" result is not representative of the current hardware.
 
 **Script:** `tests/pwm_vtarget_dmm.py`  
 **Instrument:** NI VB-8034 DMM (V terminal on VTarget pad, COM on GND)  
@@ -242,8 +250,16 @@ The XIAO board has a Schottky diode on the USB input (≈ 0.5–0.7 V drop), lea
 
 **Scripts:** `tests/pwm_vtarget_dmm.py`, `tests/test_vtarget_pwm.py`
 **Instrument:** NI VB-8034 DMM and DAP Vendor1 ADC readback
-**Hardware:** R4 = 100 Ω, R5 = 43 kΩ, C2 = 10 µF / 25 V
-**Firmware range:** 1326–4206 mV, interpolated through a 21-point calibration
+**Hardware (as documented at the time of the test):** R4 = 100 Ω, R5 = 43 kΩ, C2 = 10 µF / 25 V
+> **Correction (2026-11-25):** the KiCad schematic is the source of truth and is fitted on all
+> PCBs: R4 = **22 kΩ**, R5 = 43 kΩ, C2 = 10 µF / 25 V, R1 = 1.2 kΩ, R3 = 2.7 kΩ. The "R4 = 100 Ω"
+> above was a documentation error. With R4 = 22 kΩ the gate filter has τ ≈ 145 ms, so
+> the 0.4 s settle time used by the sweep scripts is only ~2.7 τ.
+> **Update (2026-09-08):** the 21-point table below was replaced by a 25-point table
+> (median of PCB-04/08/09/10), range 1326–4200 mV; see
+> [VTARGET_BATCH_ANALYSIS.md](../circuit_ESP32C3_Xiao/documentations/VTARGET_BATCH_ANALYSIS.md).
+
+**Firmware range (at the time):** 1326–4206 mV, interpolated through a 21-point calibration
 table (`VTARGET_CAL_TABLE` in `main/vtarget_pwm.c`) spanning PWM counts 358–982
 **Sweep:** 101 normalized control points, 0% to 100%
 **Test date:** 2026-08-31

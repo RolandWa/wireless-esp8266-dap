@@ -251,7 +251,7 @@ VTarget sensing and control use CMSIS-DAP Vendor Commands via the pyOCD API.
 |Function|pyOCD call|Command ID|Request|Response|
 |--------|----------|----------|-------|--------|
 |Read VTarget|`probe.vendor(1, [])`|`0x81`|—|`[LOW, HIGH]` voltage in mV, little-endian. `0xFFFF` = error|
-|Set VTarget|`probe.vendor(2, [LOW, HIGH])`|`0x82`|voltage in mV (1250–5000), little-endian|`[0x00]` success · `[0x01]` out of range · `[0xFF]` error|
+|Set VTarget|`probe.vendor(2, [LOW, HIGH])`|`0x82`|voltage in mV (1326–4200), little-endian|`[0x00]` success · `[0x01]` out of range · `[0xFF]` error|
 
 **Python example:**
 
@@ -363,7 +363,7 @@ A complete hardware design for the Seeed Studio XIAO ESP32-C3 module is availabl
 
 **Programmable VTarget Implementation:**
 
-For ESP32-C3 XIAO designs, a programmable target voltage feature (1.25V-5V) is available using PWM-controlled voltage regulation. See the detailed implementation guide: [VTARGET_PWM_IMPLEMENTATION.md](circuit_ESP32C3_Xiao/documentations/VTARGET_PWM_IMPLEMENTATION.md)
+For ESP32-C3 XIAO designs, a programmable target voltage feature (calibrated 1.326V-4.200V) is available using PWM-controlled voltage regulation. See the detailed implementation guide: [VTARGET_PWM_IMPLEMENTATION.md](circuit_ESP32C3_Xiao/documentations/VTARGET_PWM_IMPLEMENTATION.md)
 
 ***Alternatively, you can connect directly with wires as we gave at the beginning, without additional circuits.***
 
@@ -675,12 +675,12 @@ CONFIG_USE_WEBSOCKET_DAP=y
 
 ### Hardware — not yet assembled / tested
 
-- [ ] **VTarget PWM circuit** — assemble AP1117-ADJ + MOSFET (Q1, R4, R5, R6, R7, C2, C3) on PCB;
-  firmware (GPIO3 LEDC) is ready and confirmed sending commands correctly
-- [ ] **VTarget calibration** — after hardware assembly, measure actual output with a multimeter at
-  1.25 V, 1.8 V, 2.5 V, 3.3 V, 5.0 V and compare against requested voltage.
-  If deviation > ~5%, replace the linear interpolation in `vtarget_set_voltage()` with a
-  calibration lookup table (see `main/vtarget_pwm.c` and `docs/vtarget.md`)
+- [x] **VTarget PWM circuit** — AP1117-ADJ + MOSFET (Q1, R1, R3, R4, R5, R6, R7, C2, C3) assembled
+  on all PCBs with the values from the KiCad schematic (R4=22k, R5=43k, C2=10µF/25V, R1=1.2k, R3=2.7k)
+- [x] **VTarget calibration** — `vtarget_set_voltage()` uses a 25-point DMM calibration table
+  (1326–4200 mV, see `main/vtarget_pwm.c` and `docs/vtarget.md`)
+- [ ] **VTarget per-board calibration** — the shared table fits PCB-04/08/09/10 within ±5%;
+  other boards deviate (see `circuit_ESP32C3_Xiao/documentations/VTARGET_BATCH_ANALYSIS.md`)
 
 ### Testing — confirmed working in software, not yet exercised on real hardware
 
@@ -691,7 +691,7 @@ CONFIG_USE_WEBSOCKET_DAP=y
   register read/write with a target connected to the SWD pins
 - [ ] **UART bridge loopback at multiple baud rates** — 115200 confirmed; run
   `python tests/uart_bridge.py --loopback --all-bauds` with a loopback jumper on GPIO20/21
-- [ ] **VTarget ADC accuracy** — cross-check 5216 mV reading against a calibrated meter
+- [x] **VTarget ADC accuracy** — cross-checked against the DMM (≤ 32 mV max / 15 mV avg difference, see `tests/TEST_RESULTS.md`)
 
 ### Firmware — known issues from code review
 

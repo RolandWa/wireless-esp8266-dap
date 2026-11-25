@@ -59,8 +59,10 @@ class VTargetLinearityTest:
     """Test VTarget output linearity and VTref measurement accuracy"""
     
     # VTarget voltage range (mV)
-    VTARGET_MIN = 1250
-    VTARGET_MAX = 5000
+    # Calibrated firmware range (VTARGET_CAL_TABLE in main/vtarget_pwm.c);
+    # Vendor2 rejects requests outside it.
+    VTARGET_MIN = 1326
+    VTARGET_MAX = 4200
     
     # Test parameters
     SETTLING_TIME = 0.5  # seconds to wait after setting voltage
@@ -241,7 +243,7 @@ class VTargetLinearityTest:
         """Set VTarget voltage
         
         Args:
-            voltage_mv: Desired voltage in millivolts (1250-5000)
+            voltage_mv: Desired voltage in millivolts (1326-4200)
             
         Returns:
             True if successful, False otherwise
@@ -810,7 +812,7 @@ def main():
     parser.add_argument('-m', '--samples', type=int, default=10,
                        help='Samples per point (default: 10)')
     parser.add_argument('--voltages', type=str,
-                       help='Comma-separated list of specific voltages to test (e.g., "1250,2500,5000")')
+                       help='Comma-separated list of specific voltages to test (e.g., "1326,2500,4200")')
     parser.add_argument('--no-plot', action='store_true',
                        help='Skip plotting results')
     

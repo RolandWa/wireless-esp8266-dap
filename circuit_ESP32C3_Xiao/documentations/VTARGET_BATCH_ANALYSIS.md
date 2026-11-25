@@ -79,7 +79,9 @@ The qualified boards respond over the full VTarget range, so Q1 is switching and
 - AP1117 reference/dropout behavior
 - Board load and supply conditions
 
-The original fabrication BOM used the pre-rework values `R1=12k`, `R3=27k`, `R4=39k`, `R5=10k`, and `C2=10nF`. The reworked design calls for `R1=1.2k`, `R3=2.7k`, `R5=43k`, and `C2=10uF/25V`. R4 remains unresolved in the repository: the KiCad files currently say `22k`, while the bench documentation and header say `100R`. That value must be measured on the passing reference board before standardizing the remaining units.
+The original fabrication BOM used the pre-rework values `R1=12k`, `R3=27k`, `R4=39k`, `R5=10k`, and `C2=10nF`. The reworked design, taken from the KiCad schematic and confirmed (2026-11-25) as fitted on **all** PCBs, is `R1=1.2k`, `R3=2.7k`, `R4=22k`, `R5=43k`, and `C2=10uF/25V`. The earlier `R4=100R` in the bench documentation and header was a documentation error and has been corrected.
+
+**Consequence for this analysis:** because all boards share the same nominal component population, the board-to-board differences below cannot be explained by different rework states. See [Update 2026-11-25](#update-2026-11-25-all-boards-share-the-same-nominal-values).
 
 The VTref jumper must be installed during every test. Without it, the DAP ADC can read near zero even when the external DMM measures the correct VTarget voltage.
 
@@ -117,7 +119,43 @@ root-cause section below for why. Re-flash and re-run
 `tests/pwm_vtarget_dmm.py --board-id PCB-XX` on a cluster board (04/08/09/10)
 to confirm on real hardware before relying on retrospective analysis alone.
 
-## Root Cause: Why PCB-01/02/03/05/06/07 Don't Fit the Cluster Table
+## Update 2026-11-25: All Boards Share the Same Nominal Values
+
+Confirmed by the project owner: the component values in the KiCad schematic
+(`R1=1.2k`, `R3=2.7k`, `R4=22k`, `R5=43k`, `C2=10uF/25V`) are fitted on **all**
+PCBs, and the AP1117-ADJ is fitted everywhere. The `R4=100R` state described below
+never existed on the boards; it was a documentation error.
+
+This **rejects the "different/partial rework state" hypothesis** in the next section
+(PCB-01 reworked at an intermediate state, PCB-03/07 partially or not reworked). The
+remaining explanations for the board-to-board spread are:
+
+- **Settling time:** with `R4=22k`, `R5=43k`, `C2=10uF` the gate filter has
+  tau ≈ (R4‖R5)·C2 ≈ 145 ms (220 ms unloaded). The sweep scripts' default settle times
+  for VTarget are 0.4 s (`pwm_vtarget_dmm.py`, `measure_vtarget_vb.py`) and 0.5 s
+  (`test_vtarget_pwm.py`), i.e. only ~2.7–3.5 tau. Measured values then depend on
+  the previous setpoint (hysteresis) and on how each board was swept.
+  Re-measure with ≥ 1 s settle per point before drawing conclusions about individual boards.
+- **Physical C2:** a 10uF/25V part does not fit the 0603 footprint in many cases; how it
+  was fitted (package, flying leads, X5R/X7R DC-bias derating) can differ per board and
+  changes the filter and the effective gate voltage (max ≈ 2.18 V with Q1 threshold at
+  0.4–0.8 V, so Q1 operates in a steep region).
+- **Component tolerance:** 0603 R1/R3/R4/R5 at 1–5 % and Q1 V_th spread move the transfer
+  function, especially with the low gate drive.
+- **VTref jumper / test setup** (e.g. PCB-02's ADC wiring defect) and possible
+  hardware defects on PCB-03 and PCB-07 (restricted range 1878–4196 mV on PCB-07, 53–63 %
+  worst error on PCB-03/07), which should be inspected directly.
+
+Recommended next step: measure R1/R3/R4/R5 and C2 on PCB-03 and PCB-07 (the outliers),
+then repeat the 101-point sweep on all boards with `--settle 1.0` and re-derive the
+common table. Accept a shared table only if every board reaches ≥ 95/101 points.
+
+## Root Cause (superseded hypothesis, kept for history): Why PCB-01/02/03/05/06/07 Don't Fit the Cluster Table
+
+> **Superseded by the 2026-11-25 update above.** The component-population hypothesis
+> in this section assumed boards differed in R1/R3/R4 values; all boards actually share
+> the schematic values. The commit history table below remains accurate as a record of
+> schematic changes.
 
 Git history of `circuit_ESP32C3_Xiao/ESP32C3_Xiao_wireless_DAP.kicad_sch`
 shows the VTarget analog values were changed **three times**, and the R4 gate

@@ -59,7 +59,7 @@ Wireless CMSIS-DAP debugger implementation using ESP8266/ESP32/ESP32-C3/ESP32-S3
 - **usbip_server.c**: TCP server (port 3240) handling USBIP protocol handshake and URB transactions
 - **wifi_handle.c**: Multi-SSID WiFi connection with mDNS (`dap.local`)
 - **uart_bridge.c**: Optional UART-to-TCP bridge for SWO/RTT trace (port 1234, disabled by default)
-- **vtarget_pwm.c**: Programmable target voltage control (ESP32-C3 only, 1.25V-5.0V via PWM)
+- **vtarget_pwm.c**: Programmable target voltage control (ESP32-C3 only, calibrated 1.326V-4.200V via PWM)
 
 ### Data Flow
 ```
@@ -176,23 +176,27 @@ Target 40MHz SPI mode by ensuring `DAP_DEFAULT_SWJ_CLOCK >= 10000000` in DAP con
 ### VTarget Programmable Voltage (ESP32-C3 Only)
 
 **Circuit Topology:**
-- **AP1117-ADJ** LDO regulator with PWM-controlled feedback for 1.25V-5.0V output
+Values come from the KiCad schematic and are fitted on all PCBs (source of truth; the
+original fabrication BOM values R4=39k / R5=10k / C2=10nF were reworked).
+- **AP1117-ADJ** LDO regulator with PWM-controlled feedback, calibrated 1.326V-4.200V output
 - **YJL2304A** N-channel MOSFET in feedback divider (SOT-23, 1.4A max)
-- **PWM filtering**: R4 (39kΩ) + C2 (10nF) = 390µs time constant, 408Hz cutoff
-- **Voltage divider**: R6/R7 (100kΩ each) for AP1117 regulation
+- **Feedback divider**: R1 (1.2kΩ) / R3 (2.7kΩ)
+- **Gate drive / PWM filtering**: R4 (22kΩ) series, R5 (43kΩ) pull-down, C2 (10µF/25V) → τ ≈ (R4‖R5)·C2 ≈ 145ms, V_GS(max) ≈ 2.18V
+- **VTref sense divider**: R6/R7 (100kΩ each) to GPIO2 (ADC)
 - **Output capacitance**: C3 (10µF) for load stability
 
 **PWM Configuration:**
 - GPIO3 @ 1kHz, 10-bit resolution (1024 steps)
 - **Inverse relationship**: Higher duty = lower voltage (MOSFET ON pulls down feedback)
-- Settling time: ~1.2ms (95%), ripple <10mV p-p typical
+- Response is nonlinear → 25-point DMM calibration table `VTARGET_CAL_TABLE` (PWM 358–982 ↔ 4200–1326 mV)
+- Settling time: ~0.5–1s (gate filter τ ≈ 145ms); wait ≥ 1s before reading VTarget; VTref jumper must be fitted for ADC readback
 - Auto-initialized to 3.3V on ESP32-C3 startup in [main/main.c](../main/main.c)
 
 **Software Control:**
 ```c
 #include "main/vtarget_pwm.h"
 
-// Set voltage (1250-5000 mV range)
+// Set voltage (calibrated 1326-4200 mV range)
 vtarget_set_voltage(3300);  // 3.3V common target
 vtarget_set_voltage(1800);  // 1.8V for low-power MCUs
 
@@ -211,13 +215,12 @@ uint16_t voltage = vtarget_read_mv();  // 20-sample average
 
 **Calibration Considerations:**
 - MOSFET R_DS(on) varies with temperature (~0.3%/°C)
-- Resistor tolerance ±1% affects accuracy
-- Expected ±50mV before calibration, ±10mV achievable after
-- Calibration points: 1.25V, 1.8V, 3.0V, 3.3V, 5.0V
+- Resistor tolerance affects accuracy; the shared table fits the PCB-04/08/09/10 cluster within ±5% (mean 0.5%), other boards may need a per-board table (see [VTARGET_BATCH_ANALYSIS.md](../circuit_ESP32C3_Xiao/documentations/VTARGET_BATCH_ANALYSIS.md))
+- Recalibrate with `tests/pwm_vtarget_dmm.py --board-id PCB-XX`
 
 **Thermal Limits:**
 - <500mA recommended without heatsinking
-- Worst case: (5V - 1.25V) × 1A = 3.75W requires thermal management
+- Input to the AP1117 is ≈ 4.3–4.4V (USB 5V after the XIAO Schottky); worst case (4.4V - 1.33V) × 1A ≈ 3.1W requires thermal management
 
 ### ESP32-C3 XIAO Reference Design
 
@@ -244,7 +247,7 @@ Even pins: 2:VTref  4:GND    6:GND     8:GND    10:GND    12:GND      14:GND    
 **Note:** Pins 11/17 carry UART bridge signals. Pin 19 is VTarget output, pin 20 is VTref sense.
 
 **Key Hardware Features:**
-- Programmable VTarget power supply (1.25V-5.0V via PWM, ESP32-C3 only)
+- Programmable VTarget power supply (calibrated 1.326V-4.200V via PWM, ESP32-C3 only)
 - Integrated UART bridge on debug connectors (pins 5/7 on 10-pin, pins 11/17 on 20-pin)
 - UART bridge connects ESP GPIO20 (RX/D7) ↔ GPIO21 (TX/D6) for SWO/RTT trace
 - LED status indicator: GPIO10 for WiFi connection

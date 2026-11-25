@@ -153,8 +153,15 @@ GPIO20 (RX/D7) ←→ GPIO21 (TX/D6) (UART loopback)
 ### 3. `test_vtarget_linearity.py` - VTarget Linearity Calibration
 Comprehensive linearity testing and calibration for VTarget voltage output and VTref measurement accuracy with optional DMM reference measurements.
 
+> **Note:** the firmware accepts only the calibrated range **1326–4200 mV** (Vendor2 returns
+> status `0x01` outside it), and VTarget needs ≥ 1 s to settle (gate filter τ ≈ 145 ms).
+> The script's range is now 1326–4200 mV; the example outputs below were captured with
+> the old 1.25–5.0 V range and are illustrative only. The 0.5 s settling time is ~3.4 τ;
+> raise `SETTLING_TIME` for settled readings. For the calibrated curve use
+> `pwm_vtarget_dmm.py` (see below).
+
 **Features:**
-- Full voltage range sweep (1.25V - 5.0V)
+- Voltage range sweep (1.326V - 4.2V, the calibrated firmware range)
 - Multi-sample measurements with statistical analysis
 - **Optional Keysight 34460A/34461A/34465A/34470A DMM integration for precision reference**
 - Dual measurement comparison (DAP vs DMM)
@@ -322,7 +329,7 @@ python test_vtarget_linearity.py -d "USB0::0x2A8D::0x1301::MY********::INSTR"
 python test_vtarget_linearity.py -n 50 -d "USB0::0x2A8D::0x1301::MY********::INSTR"
 
 # Test specific voltages with DMM
-python test_vtarget_linearity.py --voltages "1250,2000,3000,4000,5000" -d "USB0::0x2A8D::0x1301::MY********::INSTR"
+python test_vtarget_linearity.py --voltages "1326,2000,3000,4000,4200" -d "USB0::0x2A8D::0x1301::MY********::INSTR"
 
 # More samples per point for higher accuracy
 python test_vtarget_linearity.py -m 20 -d "USB0::0x2A8D::0x1301::MY********::INSTR"
@@ -414,16 +421,19 @@ Test complete!
 
 Use `measure_vtarget_vb.py` to measure the VTarget output directly with a
 VirtualBench oscilloscope. Connect VTarget to Channel 1 (`mso/1`) and use the
-configured probe attenuation. The script sweeps PWM from 0% to 100% in 1%
-increments and uses the internal `niVB_MSO_ReadAnalog()` API to calculate
-average voltage, RMS voltage, and peak-to-peak ripple.
+configured probe attenuation. The script sweeps the PWM duty window reachable
+through Vendor2 (~35% to ~96%, i.e. PWM counts 358–982 = 4200–1326 mV) in 1%
+increments (about 62 points) and uses the internal `niVB_MSO_ReadAnalog()` API to
+calculate average voltage, RMS voltage, and peak-to-peak ripple. The duty-to-mV
+mapping comes from the firmware calibration table mirrored in `vtarget_cal.py`
+(keep it in sync with `VTARGET_CAL_TABLE` in `main/vtarget_pwm.c`).
 
 ```bash
-# Run the default 101-point sweep
+# Run the default sweep (1% steps, 0.4 s settle - use --settle 1.0 for settled values)
 python measure_vtarget_vb.py
 
 # Faster 5% sweep with a longer settling time
-python measure_vtarget_vb.py --step 5 --settle 0.5
+python measure_vtarget_vb.py --step 5 --settle 1.0
 
 # Specify the DAP, VirtualBench, and probe settings
 python measure_vtarget_vb.py --ip 192.168.137.123 --vb VB8034-314E194 --probe 10
@@ -439,15 +449,17 @@ to `test_results/`:
 
 Use `pwm_vtarget_dmm.py` with the VirtualBench DMM connected from VTarget to
 GND. It sweeps 101 normalized control points through the firmware's calibrated
-1324–4204 mV request range and creates a DMM-versus-DAP ADC curve.
+1326–4200 mV request range and creates a DMM-versus-DAP ADC curve.
 
 ```bash
-python pwm_vtarget_dmm.py
+python pwm_vtarget_dmm.py --board-id PCB-XX
 ```
 
-The current calibration reaches approximately 1.325–4.205 V at the endpoints.
-The middle of the curve remains nonlinear, so use the graph to derive a lookup
-table before depending on an intermediate target voltage.
+The current calibration reaches approximately 1.326–4.200 V at the endpoints.
+The middle of the response is nonlinear (handled by the 25-point firmware table).
+The default `--settle 0.4` s is only ~2.7 × the gate-filter time constant
+(τ ≈ 145 ms with R4 = 22k, R5 = 43k, C2 = 10µF); use `--settle 1.0` or more
+for settled readings, and recalibrate if you change it.
 
 - `vtarget_pwm_dmm_curve.png` - DMM and DAP ADC VTarget curve
 
@@ -635,7 +647,7 @@ table before depending on an intermediate target voltage.
 - **Solution:** Use shielded cables for measurements
 
 **Problem:** "Voltage setpoint rejected"
-- **Solution:** Verify voltage is within 1250-5000mV range
+- **Solution:** Verify voltage is within the calibrated 1326-4200mV range
 - **Solution:** Check VTarget power supply can provide required current
 - **Solution:** Ensure USB port provides adequate power (500mA+)
 
@@ -716,7 +728,7 @@ test = XiaoUSBTest()
 test.connect_usb()
 
 # Test custom voltage range
-voltages = [1250, 1500, 1800, 2500, 3300, 5000]
+voltages = [1326, 1500, 1800, 2500, 3300, 4200]
 for v in voltages:
     test.test_vtarget_set(v)
     time.sleep(0.5)
@@ -831,7 +843,7 @@ The VTarget commands use CMSIS-DAP Vendor Commands via `probe.vendor(index, data
 |Command|index|cmd_id|Request data|Response|
 |-------|-----|------|------------|--------|
 |Read VTarget|`1`|`0x81`|`[]`|`[LOW, HIGH]` — mV little-endian. `0xFFFF` = ADC error|
-|Set VTarget|`2`|`0x82`|`[LOW, HIGH]` — mV little-endian (1250–5000)|`[0x00]` ok · `[0x01]` range err · `[0xFF]` error|
+|Set VTarget|`2`|`0x82`|`[LOW, HIGH]` — mV little-endian (1326–4200)|`[0x00]` ok · `[0x01]` range err · `[0xFF]` error|
 
 **Minimal example:**
 

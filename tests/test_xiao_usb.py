@@ -146,8 +146,8 @@ class XiaoUSBTest:
 
         try:
             # Validate range
-            if not (1250 <= voltage_mv <= 5000):
-                self.log_test("VTarget Set", False, f"Invalid range: {voltage_mv} mV (must be 1250-5000)")
+            if not (1326 <= voltage_mv <= 4200):
+                self.log_test("VTarget Set", False, f"Invalid range: {voltage_mv} mV (must be 1326-4200)")
                 return False
 
             # vendor(index, data): index=2 → sends 0x80+2=0x82; response has echo stripped
@@ -161,8 +161,8 @@ class XiaoUSBTest:
                 if status == 0x00:
                     self.log_test("VTarget Set", True, f"Voltage set to {voltage_mv} mV")
                     
-                    # Wait for settling
-                    time.sleep(0.1)
+                    # Wait for settling (gate filter tau ~ 145 ms: R4=22k, R5=43k, C2=10uF)
+                    time.sleep(1.0)
                     
                     # Read back voltage
                     actual_v = self.test_vtarget_read()
@@ -270,8 +270,8 @@ class XiaoUSBTest:
         # Test 5: VTarget Set (1.8V)
         self.test_vtarget_set(1800)
         
-        # Test 6: VTarget Set (5.0V)
-        self.test_vtarget_set(5000)
+        # Test 6: VTarget Set (4.2V, top of the calibrated range)
+        self.test_vtarget_set(4200)
         
         # Test 7: SWD Connection (optional)
         input("\nPress Enter to test SWD connection (ensure target connected)...")

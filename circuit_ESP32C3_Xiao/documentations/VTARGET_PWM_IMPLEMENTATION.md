@@ -1,6 +1,14 @@
 # VTarget Programmable Voltage Control - Implementation Summary
 
-## Hardware Configuration Verified
+> **Status (2026-11-25):** component values below are taken from the KiCad
+> schematic and are fitted on all PCBs (AP1117-ADJ everywhere). The original
+> fabrication BOM (R1=12k, R3=27k, R4=39k, R5=10k, C2=10nF) left Q1 permanently
+> off and was reworked; see
+> [VTARGET_REWORK_INSTRUCTIONS.txt](VTARGET_REWORK_INSTRUCTIONS.txt) and
+> [VTARGET_BATCH_ANALYSIS.md](VTARGET_BATCH_ANALYSIS.md). The firmware-calibrated
+> output range is **1.326 V – 4.200 V**, not the theoretical 1.25 V – 5 V.
+
+## Hardware Configuration
 
 ### Capacitors
 ✅ **C3**: 10µF (0805) - VTarget output capacitor on AP1117-ADJ
@@ -8,10 +16,12 @@
 - Purpose: Energy storage for VTarget output, provides stable output voltage
 - Recommended minimum: 10µF for AP1117 stability
 
-✅ **C2**: 10nF (0603) - PWM filter capacitor
-- Location: (104.14, 175.26)  
-- Purpose: Smooths PWM signal in feedback divider network
-- Filter time constant: τ = R4 × C2 = 39kΩ × 10nF = 390µs
+✅ **C2**: 10µF / 25V - PWM filter capacitor on the Q1 gate
+- Purpose: Turns the 1 kHz PWM into a DC gate level for Q1
+- Filter time constant: τ = (R4‖R5) × C2 ≈ 14.6kΩ × 10µF ≈ 145 ms
+  (R4 × C2 = 22kΩ × 10µF = 220 ms when unloaded)
+- The 0603 footprint is too small for a 10µF/25V part in many cases; check how
+  it was fitted on each board (e.g. larger package with flying leads).
 
 ✅ **C1**: 10nF (0603) - Reference divider smoothing
 - Purpose: Additional filtering for voltage reference
@@ -19,7 +29,7 @@
 ### Circuit Components
 - **U2 (AP1117-ADJ)**: Adjustable LDO regulator at (119.38, 128.27)
   - Input: 5V supply
-  - Output: VTarget (1.25V to 5V adjustable)
+  - Output: VTarget (calibrated 1.326V to 4.200V)
   - Max current: 1A
 
 - **Q1 (YJL2304A)**: N-channel MOSFET at (116.84, 170.18)
@@ -28,11 +38,13 @@
   - Max voltage: 30V
   - Typical R_DS(on): ~55mΩ @ V_GS=4.5V
 
-- **Voltage Divider:**
-  - R6: 100kΩ (upper feedback resistor)
-  - R7: 100kΩ (lower feedback resistor)
-  - R4: 39kΩ (PWM gate series resistor)
-  - R5: 10kΩ (MOSFET gate pull-down)
+- **Resistors:**
+  - R1: 1.2kΩ, R3: 2.7kΩ (AP1117-ADJ feedback divider, Q1 modulates it)
+  - R4: 22kΩ (PWM gate series resistor)
+  - R5: 43kΩ (MOSFET gate pull-down)
+  - R6, R7: 100kΩ each (VTref sense divider to GPIO2)
+
+- **Gate drive:** V_GS(max) = 3.3V × R5 / (R4 + R5) = 3.3V × 43k / 65k ≈ 2.18V
 
 ## PWM Implementation
 
@@ -48,43 +60,50 @@
 Frequency: 1 kHz
 Period: 1 ms
 Resolution: ~0.98 µs per step (1023 steps)
-Voltage step: ~3.67 mV per duty cycle step
 ```
 
 ### Filter Design
 ```
-RC Filter: R4 (39k) + C2 (10nF)
-Time constant τ = 390 µs
-Cutoff frequency fc = 1/(2πτ) ≈ 408 Hz
+RC Filter: R4 (22k) in series, C2 (10µF) on the gate, R5 (43k) pull-down as load
+Time constant τ = (R4‖R5) × C2 ≈ 14.6kΩ × 10µF ≈ 145 ms   (R4 × C2 = 220 ms unloaded)
+Cutoff frequency fc = 1/(2πτ) ≈ 1.1 Hz   (0.72 Hz unloaded)
 ```
 
 At 1 kHz PWM:
-- 2.45× above cutoff → good attenuation of switching noise
-- Fast enough response time (~1.2 ms to 95% settling)
+- ~900× above cutoff → PWM ripple on the gate is negligible; Q1 sees a DC level
+- Slow response: ~3τ ≈ 0.45 s to 95 %, ~5τ ≈ 0.7 s to 99 % settling
+- Wait ≥ 0.5 s (≥ 1 s for best accuracy) after a setpoint change before reading VTarget
 
 ## Voltage Control Algorithm
 
 ### Inverse Relationship
 ```c
-// Higher voltage → Lower PWM duty (MOSFET more OFF)
-// Lower voltage → Higher PWM duty (MOSFET more ON)
-
-duty_cycle = MAX_DUTY × (MAX_V - target_V) / (MAX_V - MIN_V)
+// Higher voltage → Lower PWM duty (Q1 more OFF)
+// Lower voltage → Higher PWM duty (Q1 more ON)
 ```
 
+The response is **nonlinear**, so the firmware does not use a straight-line
+duty formula. `vtarget_set_voltage()` interpolates piecewise-linearly through a
+25-point DMM-measured table (`VTARGET_CAL_TABLE` in
+[main/vtarget_pwm.c](../../main/vtarget_pwm.c)), which is the median response of
+the PCB-04/08/09/10 cluster (see [VTARGET_BATCH_ANALYSIS.md](VTARGET_BATCH_ANALYSIS.md)).
+
 ### Voltage Range
-- **Minimum**: 1.25V (100% duty, MOSFET fully ON)
-- **Maximum**: 5.00V (0% duty, MOSFET fully OFF)
-- **Resolution**: ~3.67 mV steps (1024 levels)
+- **Maximum**: 4.200V (PWM count 358, Q1 least on)
+- **Minimum**: 1.326V (PWM count 982, Q1 most on)
+- Requests outside 1326–4200 mV are rejected (`ESP_ERR_INVALID_ARG` / vendor status 0x01)
+- The AP1117-ADJ cannot reach 5 V from the USB-fed ~4.3–4.4 V input (dropout), and
+  the 1.25 V reference limit is not reached with the current R1/R3/Q1 network.
 
 ### AP1117-ADJ Formula
 ```
-V_out = 1.25V × (1 + R_upper / R_lower)
+V_out = 1.25V × (1 + R3 / R1)      (+ adjust-pin current term)
 
-With PWM-controlled MOSFET:
-- R_upper = R6 (100kΩ fixed)
-- R_lower = R7 || R_MOSFET (variable based on PWM)
+With Q1 open (no gate drive):   1.25V × (1 + 2.7k / 1.2k) = 4.06V nominal
+With Q1 conducting, its R_DS(on) loads the feedback node and lowers V_out.
 ```
+Measured maximum output is ≈ 4.2 V (limited by regulator tolerance and input
+headroom); measured minimum ≈ 1.32 V.
 
 ## API Usage
 
@@ -101,9 +120,9 @@ esp_err_t ret = vtarget_pwm_init();
 // Set target voltage to 3.3V
 esp_err_t ret = vtarget_set_voltage(3300);  // millivolts
 
-// Valid range: 1250 mV to 5000 mV
-vtarget_set_voltage(1250);  // Minimum voltage
-vtarget_set_voltage(5000);  // Maximum voltage
+// Valid range: 1326 mV to 4200 mV (calibrated)
+vtarget_set_voltage(1326);  // Minimum voltage
+vtarget_set_voltage(4200);  // Maximum voltage
 vtarget_set_voltage(3300);  // Common 3.3V
 ```
 
@@ -119,12 +138,12 @@ printf("VTarget: %u mV\n", voltage_mv);
 ### Raw Duty Cycle Control
 ```c
 // For calibration/testing: set raw PWM duty
-vtarget_set_duty_raw(0);     // 0% → ~5V output
-vtarget_set_duty_raw(512);   // 50% → ~3.1V output  
-vtarget_set_duty_raw(1023);  // 100% → ~1.25V output
+vtarget_set_duty_raw(358);   // → ~4.2V output (top of calibrated range)
+vtarget_set_duty_raw(763);   // → ~2.9V output
+vtarget_set_duty_raw(982);   // → ~1.33V output (bottom of calibrated range)
 
 // Get current duty
-uint16_t duty = vtarget_get_duty();
+uint16_t duty = vtarget_get_duty_raw();
 ```
 
 ## DAP Vendor Commands
@@ -151,7 +170,7 @@ Byte 2: Voltage high byte (mV)
   - Response: `0x81 0x08 0x07` (1800 = 0x0708)
 
 ### Command 0x82: Set VTarget Voltage
-Set the target voltage output (1250-5000 mV).
+Set the target voltage output (calibrated range 1326-4200 mV).
 
 **Request:**
 ```
@@ -165,7 +184,7 @@ Byte 2: Voltage high byte (mV)
 Byte 0: 0x82 (Command ID echo)
 Byte 1: Status
   - 0x00 = Success
-  - 0x01 = Invalid voltage range (not 1250-5000 mV)
+  - 0x01 = Invalid voltage range (not 1326-4200 mV)
   - 0xFF = Not supported / other error
 ```
 
@@ -183,15 +202,15 @@ Request:  0x82 0x08 0x07
 Response: 0x82 0x00  (success)
 ```
 
-Set 5.0V (5000 mV):
+Set 4.2V (4200 mV, top of calibrated range):
 ```
-Request:  0x82 0x88 0x13
+Request:  0x82 0x68 0x10
 Response: 0x82 0x00  (success)
 ```
 
-Set invalid 6V (6000 mV):
+Set 5.0V (5000 mV) — above the calibrated range:
 ```
-Request:  0x82 0x70 0x17
+Request:  0x82 0x88 0x13
 Response: 0x82 0x01  (out of range)
 ```
 
@@ -227,15 +246,16 @@ else:
 ```
 
 ## Example Workflow
-// Set specific voltage (1250-5000 mV)
+```c
+// Set specific voltage (1326-4200 mV)
 vtarget_set_voltage(3300);  // 3.3V
 vtarget_set_voltage(1800);  // 1.8V
-vtarget_set_voltage(5000);  // 5.0V
+vtarget_set_voltage(4200);  // 4.2V (maximum)
 
 // Or use convenience macros
 VTARGET_SET_3V3();
 VTARGET_SET_1V8();
-VTARGET_SET_5V0();
+VTARGET_SET_4V2();
 ```
 
 ### Raw Control (for calibration)
@@ -266,53 +286,53 @@ The system initializes with:
 
 ## Calibration Notes
 
-The voltage-to-duty mapping is **linear approximation** and may need calibration:
+The duty-to-voltage response of the Q1/AP1117-ADJ network is **nonlinear**, so the
+firmware uses a measured 25-point table (`VTARGET_CAL_TABLE`) instead of a formula.
+The table is the median of the PCB-04/08/09/10 cluster; other boards may deviate
+by more than ±5 % (see [VTARGET_BATCH_ANALYSIS.md](VTARGET_BATCH_ANALYSIS.md)).
 
 ### Factors Affecting Accuracy:
-1. **MOSFET R_DS(on) variation** (temperature, V_GS dependent)
-2. **Resistor tolerances** (R6, R7 are ±1% typ)
-3. **Load current** (AP1117 dropout voltage)
-4. **Temperature coefficient** (~0.3%/°C for MOSFET)
+1. **Settling time** (τ ≈ 145 ms): measure only after ≥ 0.5–1 s, otherwise the
+   curve depends on the previous setpoint
+2. **MOSFET V_th / R_DS(on) variation** (temperature, V_GS dependent; V_GS(max) ≈ 2.18 V)
+3. **Resistor tolerances** (R1, R3, R4, R5; 0603 parts, 1–5 %)
+4. **C2 physical part** (10µF/25V tolerance and DC bias derating)
+5. **Load current** (AP1117 dropout voltage)
+6. **VTref jumper**: must be fitted for ADC readback, otherwise it reads ≈ 0 mV
 
 ### Calibration Procedure:
-```c
-// 1. Measure actual output with multimeter
-// 2. Adjust duty cycle to achieve target
-vtarget_set_duty_raw(duty);
+Run `tests/pwm_vtarget_dmm.py --board-id PCB-XX` with a DMM on VTarget; it writes
+`tests/test_results/vtarget_PCB-XX_measurements.csv` (duty ↔ DMM voltage). Rebuild
+`VTARGET_CAL_TABLE` from that data (and keep the `FW_CAL_TABLE` mirrors in
+`tests/pwm_vtarget_dmm.py` and `tests/test_vtarget_pwm.py` in sync).
 
-// 3. Record duty vs. voltage data points
-// 4. Create calibration table or polynomial
-```
-
-### Suggested Calibration Points:
-- 1.25V (min)
-- 1.8V (common)
+### Calibration Points (current table range):
+- 1.326V (min, PWM 982)
+- 1.8V
 - 3.0V
-- 3.3V (common)
-- 5.0V (max)
+- 3.3V (default at boot)
+- 4.2V (max, PWM 358)
 
 ## Expected Performance
 
 ### Settling Time
-- RC filter time constant: 390 µs
-- 95% settling: ~3τ = 1.2 ms
-- 99% settling: ~5τ = 2.0 ms
+- Gate RC time constant: τ ≈ 145 ms
+- 95% settling: ~3τ ≈ 0.45 s
+- 99% settling: ~5τ ≈ 0.7 s (use ≥ 1 s per step in tests)
 
 ### Ripple Voltage
-At 1 kHz PWM with 10nF filter:
-- Attenuation: ~-8 dB at 1 kHz
-- Expected ripple: <10 mV p-p (typical)
-- C3 (10µF) further reduces output ripple
+- The 1 kHz PWM is attenuated ~900× by the gate filter (fc ≈ 1 Hz); VTarget ripple
+  is limited by the AP1117-ADJ loop and C3 (10µF), not by the PWM.
 
-### Accuracy (before calibration)
-- Theoretical: ±3.67 mV (1 LSB)
-- Practical: ±50 mV (resistor tolerances, MOSFET variation)
-- After calibration: ±10 mV achievable
+### Accuracy
+- Measured on the cluster boards with the shared table: mean 0.5 %, worst 1.9 %
+  against the requested voltage (see VTARGET_BATCH_ANALYSIS.md)
+- Other boards need a per-board table for ±5 %
 
 ## Safety Features
 
 1. **Default to safe voltage**: Initializes to 3.3V
-2. **Range checking**: Rejects voltages outside 1.25-5.0V
+2. **Range checking**: Rejects voltages outside 1.326-4.200V
 3. **Pull-down resistor**: R5 ensures MOSFET OFF if GPIO fails
 4. **Overcurrent protection**: AP1117 has built-in current limiting
 
@@ -324,7 +344,7 @@ extern uint32_t vtarget_read_mv(void);  // From DAP_vendor.c
 
 // Set voltage
 vtarget_set_voltage(3300);
-vTaskDelay(pdMS_TO_TICKS(10));  // Wait for settling
+vTaskDelay(pdMS_TO_TICKS(1000));  // Wait for settling (gate filter tau ~145 ms)
 
 // Verify actual output
 uint32_t actual_mv = vtarget_read_mv();
@@ -336,18 +356,19 @@ printf("Target: 3300 mV, Actual: %lu mV\n", actual_mv);
 ### Current Budget
 - AP1117-ADJ quiescent: ~5 mA
 - MOSFET gate: ~0 µA (DC, capacitive charging only)
-- Pull-down R5: 330 µA @ 3.3V PWM
-- Total control circuit: ~6 mA
+- Gate network R4 + R5: up to 3.3V / (22k + 43k) ≈ 51 µA at 100 % duty
+- Total control circuit: ~5 mA (dominated by AP1117-ADJ quiescent current)
 
 ### Heat Dissipation
 ```
 P_dissipation = (V_in - V_out) × I_load
+V_in ≈ 4.3–4.4V (USB 5V after the XIAO Schottky diode)
 
 Example at 3.3V, 100 mA load:
-P = (5V - 3.3V) × 0.1A = 170 mW (acceptable)
+P = (4.4V - 3.3V) × 0.1A = 110 mW (acceptable)
 
-Worst case at 1.25V, 1A load:
-P = (5V - 1.25V) × 1A = 3.75W (requires heatsinking!)
+Worst case at 1.33V, 1A load:
+P = (4.4V - 1.33V) × 1A ≈ 3.1W (requires heatsinking!)
 ```
 
 **Recommendation**: Keep load current <500 mA for reliable operation without heatsinking.
@@ -355,8 +376,9 @@ P = (5V - 1.25V) × 1A = 3.75W (requires heatsinking!)
 ## Testing Checklist
 
 - [ ] Verify C3 (10µF) installed on VTarget output
-- [ ] Verify C2 (10nF) installed near MOSFET
-- [ ] Test voltage sweep: 1.25V → 5.0V
+- [ ] Verify C2 (10µF/25V) fitted at the Q1 gate and R4 = 22k, R5 = 43k, R1 = 1.2k, R3 = 2.7k
+- [ ] Verify the VTref jumper is fitted
+- [ ] Test voltage sweep: 1.326V → 4.2V (≥ 1 s per step)
 - [ ] Measure ripple voltage with oscilloscope
 - [ ] Verify ADC readback matches set voltage
 - [ ] Test load regulation (no load → 100 mA)
@@ -383,7 +405,7 @@ Pin 9: VTarget      Pin 10: nRST
 - **Pin 9**: VTarget output - typically GND in standard pinout
 
 **VTarget Connection:**
-- Pin 9 provides programmable 1.25V-5.0V output from AP1117-ADJ circuit
+- Pin 9 provides programmable 1.326V-4.200V (calibrated) output from AP1117-ADJ circuit
 - Maximum current: 500mA recommended (1A absolute maximum with cooling)
 - Protects target device from over-voltage when set correctly
 - Can be monitored via Pin 1 (VTref sense)
@@ -410,8 +432,8 @@ Even pins: 2:VTref  4:GND    6:GND     8:GND    10:GND    12:GND      14:GND    
 
 ### VTarget Power Supply Capability
 ```
-Input:  5V from USB
-Output: 1.25V to 5.0V programmable
+Input:  5V from USB (≈ 4.3–4.4V at the AP1117 after the XIAO Schottky diode)
+Output: 1.326V to 4.200V programmable (calibrated)
 Load:   Up to 500 mA typical, 1A max (with thermal management)
 ```
 
@@ -425,7 +447,9 @@ Load:   Up to 500 mA typical, 1A max (with thermal management)
 ### Voltage Won't Change
 - Check GPIO3 PWM output with scope/logic analyzer
 - Verify MOSFET Q1 is installed correctly
-- Check R4, R5 values and connections
+- Check R1, R3, R4, R5 and C2 against the schematic (a board with the original
+  fabrication values R4 = 39k / R5 = 10k leaves Q1 off and VTarget stuck near 4.2 V)
+- Allow ≥ 1 s after a change (gate filter τ ≈ 145 ms)
 - Verify AP1117-ADJ is genuine part (not counterfeit)
 
 ### Voltage Unstable/Oscillating
@@ -435,14 +459,15 @@ Load:   Up to 500 mA typical, 1A max (with thermal management)
 - Add 100nF ceramic cap in parallel with C3
 
 ### Voltage Too High/Low
-- Verify R6, R7 values (should be 100kΩ each)
+- Verify R6, R7 values (should be 100kΩ each) and that the VTref jumper is fitted
+  (otherwise the ADC reads ≈ 0 mV while a DMM shows the real voltage)
 - Check MOSFET R_DS(on) spec
-- Perform calibration procedure
-- Verify input voltage is 5V ±5%
+- Perform calibration procedure (board-specific table if the board is outside the cluster)
+- Verify input voltage (USB 5V minus the Schottky drop, ≈ 4.3–4.4V at the AP1117)
 
 ### PWM Noise on Output
-- Increase C2 capacitance (try 22nF or 47nF)
-- Lower PWM frequency to 500 Hz
+- The gate filter (fc ≈ 1 Hz) already removes PWM ripple; look at the AP1117 loop,
+  C3 ESR and layout instead
 - Add RC filter on VTarget output
 - Use lower ESR output capacitor
 

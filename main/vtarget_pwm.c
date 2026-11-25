@@ -2,14 +2,16 @@
  * @file vtarget_pwm.c
  * @brief Programmable VTarget voltage control using PWM on GPIO3
  * 
- * Controls AP1117-ADJ output voltage (1.25V to 5V) via PWM-controlled MOSFET
- * in the feedback divider network.
- * 
- * Circuit topology:
- * - GPIO3 PWM → R4 (39k) → Q1 (YJL2304A MOSFET) Gate
- * - R5 (10k) pull-down on gate
- * - C2 (10nF) PWM filter
- * - AP1117-ADJ with R6/R7 (100k each) + MOSFET in feedback
+ * Controls AP1117-ADJ output voltage (calibrated range 1.326V to 4.200V) via
+ * PWM-controlled MOSFET in the feedback divider network.
+ *
+ * Circuit topology (values from the KiCad schematic, fitted on all PCBs):
+ * - GPIO3 PWM → R4 (22k) → Q1 (YJL2304A MOSFET) Gate
+ * - R5 (43k) pull-down on gate
+ * - C2 (10uF / 25V) PWM filter: tau ~ (R4||R5)*C2 ~ 145 ms, so the gate is
+ *   effectively a DC level and VTarget needs ~0.5-1 s to settle after a change
+ * - AP1117-ADJ feedback divider R1 (1.2k) / R3 (2.7k) + Q1 drain-source
+ * - R6/R7 (100k each) form the VTref sense divider to GPIO2 (ADC)
  * - C3 (10uF) output capacitor on VTarget
  */
 
@@ -91,7 +93,7 @@ static uint32_t vtarget_interp_duty(uint16_t voltage_mv)
  * 
  * Configures GPIO3 as PWM output at 1 kHz with 10-bit resolution.
  * The PWM signal controls a MOSFET in the AP1117-ADJ feedback network
- * to adjust the output voltage from 1.25V to 5V.
+ * to adjust the output voltage over the calibrated 1.326V to 4.200V range.
  * 
  * @return ESP_OK on success, error code otherwise
  */
@@ -133,7 +135,7 @@ esp_err_t vtarget_pwm_init(void)
         return ret;
     }
 
-    // Set initial duty cycle to 0% (MOSFET OFF = max voltage = 5V)
+    // Set initial duty cycle to 0% (MOSFET OFF = max voltage, ~4.2V)
     ret = ledc_set_duty(VTARGET_PWM_MODE, VTARGET_PWM_CHANNEL, 0);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to set initial duty: %s", esp_err_to_name(ret));

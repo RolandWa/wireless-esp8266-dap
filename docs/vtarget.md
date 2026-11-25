@@ -27,22 +27,36 @@ The circuit topology in `main/vtarget_pwm.c`:
 | Component | Value | Role |
 | --------- | ----- | ---- |
 | GPIO3 | PWM output | Controls MOSFET gate |
-| R4 | 100 Ω | Gate series resistor |
+| R4 | 22 kΩ | Gate series resistor |
 | R5 | 43 kΩ | Gate pull-down |
 | C2 | 10 µF, 25 V | PWM filter |
 | Q1 | YJL2304A | N-channel MOSFET in AP1117-ADJ feedback |
 | U2 | AP1117-ADJ | Adjustable LDO regulator |
-| R6, R7 | 100 kΩ each | Feedback voltage divider |
+| R1, R3 | 1.2 kΩ, 2.7 kΩ | AP1117-ADJ feedback divider |
+| R6, R7 | 100 kΩ each | VTref sense divider to GPIO2 (ADC) |
 | C3 | 10 µF | Output capacitor |
 
-PWM: 1 kHz, 10-bit resolution (0–1023). The firmware interpolates the
-requested voltage through a 21-point calibration table measured with a DMM
-(`VTARGET_CAL_TABLE` in `main/vtarget_pwm.c`), spanning PWM counts 358–982
-and 1326–4206 mV, instead of assuming a straight line between two endpoints.
+These values come from the KiCad schematic
+(`circuit_ESP32C3_Xiao/ESP32C3_Xiao_wireless_DAP.kicad_sch`) and are fitted on
+all PCBs.
+
+PWM: 1 kHz, 10-bit resolution (0–1023). The gate filter (R4 into C2 with R5 as
+load) has τ ≈ (R4‖R5)·C2 ≈ 145 ms (R4·C2 = 220 ms unloaded), so the gate sees a
+DC level and VTarget needs roughly 0.5–1 s to settle after a change. Maximum
+gate voltage is 3.3 V · R5 / (R4 + R5) ≈ 2.18 V. Wait at least ~0.5 s before
+reading VTarget after a change (≥ 1 s for a 1 % settle).
+
+The firmware interpolates the requested voltage through a 25-point calibration
+table measured with a DMM (`VTARGET_CAL_TABLE` in `main/vtarget_pwm.c`),
+spanning PWM counts 358–982 and 1326–4200 mV, instead of assuming a straight
+line between two endpoints. The table is the median response of the
+PCB-04/08/09/10 cluster; see
+[VTARGET_BATCH_ANALYSIS.md](../circuit_ESP32C3_Xiao/documentations/VTARGET_BATCH_ANALYSIS.md)
+for how it fits the other boards.
 
 The Q1/AP1117 feedback response is nonlinear, especially in the middle of the
 range. Recalibrate the table (rerun `tests/pwm_vtarget_dmm.py`, which now also
-saves `vtarget_pwm_dmm_measurements.csv`) if R4/R5/C2 or Q1 change.
+saves `vtarget_pwm_dmm_measurements.csv`) if R1/R3/R4/R5/C2 or Q1 change.
 
 At boot: `vtarget_pwm_init()` is called and the default is set to 3300 mV.
 
@@ -66,10 +80,10 @@ At boot: `vtarget_pwm_init()` is called and the default is set to 3300 mV.
 | ----- | ------ |
 | Command ID | `0x82` (`ID_DAP_Vendor2`) |
 | Request | `[0x82, voltage_low, voltage_high]` + zero padding |
-| Encoding | `voltage_mv` little-endian, valid range 1326–4206 mV |
+| Encoding | `voltage_mv` little-endian, valid range 1326–4200 mV |
 | Response | `[0x82, status]` |
 | Status 0x00 | OK — PWM duty updated |
-| Status 0x01 | Invalid range (outside 1326–4206 mV) |
+| Status 0x01 | Invalid range (outside 1326–4200 mV) |
 | Status 0xFF | Not supported on this target (non-C3/S3 build) |
 
 ### Serial debug commands (115200 baud, COM12)
@@ -92,7 +106,7 @@ void     vtarget_log_boot_reading(void);      // called once at startup
 
 // main/vtarget_pwm.h
 esp_err_t vtarget_pwm_init(void);             // call once at boot (main.c does this)
-esp_err_t vtarget_set_voltage(uint16_t mV);  // 1326-4206 mV, calibration-table interpolated
+esp_err_t vtarget_set_voltage(uint16_t mV);  // 1326-4200 mV, calibration-table interpolated
 esp_err_t vtarget_set_duty_raw(uint16_t d);  // 0-1023, for calibration
 uint16_t  vtarget_get_duty_raw(void);
 ```

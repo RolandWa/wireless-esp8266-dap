@@ -4,7 +4,12 @@ VTARGET REWORK INSTRUCTIONS - ESP32-C3 XIAO WIRELESS DAP
 Date        : 2026-09-03
 Applies to  : All PCBs assembled from the JLCPCB fabrication BOM
               (circuit_ESP32C3_Xiao/jlcpcb/production_files/)
-Status      : PCB-01 already reworked and PASSING. PCB-02..PCB-10 need rework.
+Status      : UPDATE 2026-11-25 - the rework below has been applied to ALL PCBs
+              (PCB-01..PCB-10) using the values in the KiCad schematic, and
+              AP1117-ADJ is fitted everywhere. This document is kept as the
+              record of the rework and its root cause.
+              (Original 2026-09-03 status: PCB-01 reworked and PASSING,
+              PCB-02..PCB-10 needed rework.)
 
 --------------------------------------------------------------------------------
 1. SYMPTOM
@@ -55,7 +60,7 @@ design. All are 0603 footprints on the PCB.
 
     Ref  Function                        Fitted (fab)  Required        Note
     ---- ------------------------------- ------------- --------------- ---------
-    R4   Q1 gate series resistor         39k           SEE SECTION 4   critical
+    R4   Q1 gate series resistor         39k           22k (sect. 4)   critical
     R5   Q1 gate pull-down               10k           43k             critical
     C2   PWM filter capacitor            10nF          10uF / 25V      see 5.2
     R1   AP1117 feedback divider, lower  12k           1.2k
@@ -73,32 +78,27 @@ Old part numbers (for identification of what is currently fitted):
     C2 = 10nF  LCSC C9900224280
 
 --------------------------------------------------------------------------------
-4. OPEN ITEM - CONFIRM R4 BEFORE ORDERING PARTS
+4. R4 VALUE - RESOLVED (2026-11-25): R4 = 22k
 --------------------------------------------------------------------------------
-There is an unresolved conflict in the R4 value. Resolve this before reworking
-the remaining boards.
+The R4 value was previously in conflict between the KiCad schematic (22k) and
+the docs / header comment / bench notes (100 ohm). It is resolved: the KiCad
+schematic is the source of truth and its values (R1 = 1.2k, R3 = 2.7k,
+R4 = 22k, R5 = 43k, C2 = 10uF/25V) are fitted on all PCBs. The 100 ohm value
+in docs/vtarget.md, main/vtarget_pwm.h and the bench notes was wrong and has
+been corrected.
 
-    Source                                        R4 value
-    --------------------------------------------  --------
-    KiCad schematic + PCB (current, commit de4efaf)  22k
-    docs/vtarget.md                                  100 ohm
-    main/vtarget_pwm.h header comment                100 ohm
-    Verbal note during bench work                    100 ohm
+History (for reference): 100R was written into the KiCad files in commit
+b58231a and then removed again in commit de4efaf, which reverted R4 to 22k.
 
-History: the value 100R was written into the KiCad files in commit b58231a and
-then removed again in commit de4efaf, which reverted R4 to 22k.
+Consequences of R4 = 22k with C2 = 10uF and R5 = 43k:
 
-The two options behave differently in the PWM filter formed with C2 = 10uF:
+    tau = R4 x C2           = 220 ms  (unloaded)
+    tau = (R4 || R5) x C2   = 145 ms  (with R5 loading the gate)
+    cutoff                  = 0.7 - 1.1 Hz
+    Vgs(max) = 3.3 V x 43k / (22k + 43k) = 2.18 V
 
-    R4 = 100 ohm : tau = 1 ms,    cutoff = 159 Hz,  Vgs(max) = 3.29 V
-    R4 = 22k     : tau = 220 ms,  cutoff = 0.72 Hz, Vgs(max) = 2.18 V
-
-Both can work, but they are not interchangeable: 22k settles far slower and
-gives reduced gate drive.
-
-ACTION: measure the resistor actually fitted at R4 on PCB-01 (the board that
-passes 101/101) and use that value for all remaining boards. Then correct
-whichever source is wrong so the schematic, the docs and the hardware agree.
+VTarget therefore needs roughly 0.5 - 1 s to settle after a setpoint change.
+Test scripts must wait at least that long per step (see tests/README.md).
 
 --------------------------------------------------------------------------------
 5. REWORK NOTES
@@ -132,7 +132,7 @@ whichever source is wrong so the schematic, the docs and the hardware agree.
     "DAP" and use --ip 192.168.4.1 instead.
 
 6.3 Pass criteria: 101/101 points within +/-5%, and a DMM range spanning
-    approximately 1340 - 4200 mV. A range narrower than 50 mV means Q1 is still
+    approximately 1320 - 4200 mV. A range narrower than 50 mV means Q1 is still
     not switching and the rework is incomplete.
 
 6.4 Results are written to:
@@ -141,23 +141,37 @@ whichever source is wrong so the schematic, the docs and the hardware agree.
         tests/test_results/vtarget_production_summary.csv
 
 6.5 The firmware calibration table (VTARGET_CAL_TABLE in main/vtarget_pwm.c) was
-    measured on PCB-01. Confirm on the first reworked board that the same table
-    still passes before assuming it applies to the whole batch. If a reworked
-    board tracks the curve but reads consistently high or low, the table needs
-    to be re-measured rather than the hardware re-reworked.
+    originally measured on PCB-01. Since 2026-09-08 it is the 25-point median of
+    PCB-04/08/09/10 (range 1326-4200 mV). If a reworked board tracks the curve
+    but reads consistently high or low, the table needs to be re-measured
+    (per-board table) rather than the hardware re-reworked. See
+    VTARGET_BATCH_ANALYSIS.md.
 
 --------------------------------------------------------------------------------
-7. DESIGN FILES TO CORRECT
+7. DESIGN FILES - UPDATED 2026-11-25
 --------------------------------------------------------------------------------
-The fabrication outputs still contain the original values and will rebuild
-faulty boards if reused as-is:
+The BOM files and the LCSC/TME fields in the KiCad schematic and PCB now match
+the reworked values:
+
+    Ref  Value        LCSC      Part
+    ---- ------------ --------- ----------------------------------------
+    R1   1.2k         C114605   Yageo RC0603FR-071K2L (1%)
+    R3   2.7k         C114612   Yageo RC0603FR-072K7L (1%)
+    R4   22k          C114065   Yageo RC0603FR-0722KL (1%)
+    R5   43k          C137719   Yageo RC0603FR-0743KL (1%)
+    C2   10uF / 25V   C96446    Samsung CL10A106MA8NRNC (X5R, 0603)
+
+1% parts were chosen because 5% versions of 2.7k / 22k / 43k are not stocked
+at LCSC. C2 is available in the 0603 footprint, so flying leads are no longer
+needed. Verify the part numbers and stock on lcsc.com before ordering.
+
+The generated CSVs are git-ignored (local files only):
 
     circuit_ESP32C3_Xiao/jlcpcb/production_files/BOM-ESP32C3_Xiao_wireless_DAP.csv
     circuit_ESP32C3_Xiao/ESP32C3_Xiao_wireless_DAP.csv
 
-Both list R4 = 39k, R5 = 10k, C2 = 10nF, R1 = 12k, R3 = 27k. Regenerate them
-from the corrected schematic before the next fabrication run, and update the
-LCSC part numbers for the new values.
+Regenerate the gerber/BOM/CPL package and circuit_ESP32C3_Xiao/bom/ibom.html
+from the current KiCad files before the next fabrication run.
 
 --------------------------------------------------------------------------------
 8. REFERENCES
