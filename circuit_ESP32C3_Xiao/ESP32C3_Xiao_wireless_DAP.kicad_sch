@@ -6331,7 +6331,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C163424"
+		(property "LCSC" "C114065"
 			(at 73.66 163.83 0)
 			(effects
 				(font
@@ -6340,7 +6340,7 @@
 				(hide yes)
 			)
 		)
-		(property "TME" "RC0603JR-0739KL"
+		(property "TME" "RC0603FR-0722KL"
 			(at 73.66 170.18 90)
 			(effects
 				(font
@@ -9249,7 +9249,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C98220"
+		(property "LCSC" "C137719"
 			(at 97.79 173.9899 0)
 			(effects
 				(font
@@ -9258,7 +9258,7 @@
 				(hide yes)
 			)
 		)
-		(property "TME" "RC0603JR-0710KL"
+		(property "TME" "RC0603FR-0743KL"
 			(at 95.25 175.26 0)
 			(effects
 				(font
@@ -10568,7 +10568,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C9900224280"
+		(property "LCSC" "C96446"
 			(at 107.95 173.9899 0)
 			(effects
 				(font
@@ -10577,7 +10577,7 @@
 				(hide yes)
 			)
 		)
-		(property "TME" "0603B103K500CG"
+		(property "TME" "CL10A106MA8NRNC"
 			(at 104.14 175.26 0)
 			(effects
 				(font
@@ -10982,7 +10982,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C114659"
+		(property "LCSC" "C114605"
 			(at 140.97 137.1599 0)
 			(effects
 				(font
@@ -10991,7 +10991,7 @@
 				(hide yes)
 			)
 		)
-		(property "TME" "RC0603JR-0712KL"
+		(property "TME" "RC0603FR-071K2L"
 			(at 138.43 138.43 0)
 			(effects
 				(font
@@ -11240,7 +11240,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C114614"
+		(property "LCSC" "C114612"
 			(at 130.81 163.8299 0)
 			(effects
 				(font
@@ -11267,7 +11267,7 @@
 				(hide yes)
 			)
 		)
-		(property "TME" "RC0603JR-0727KL"
+		(property "TME" "RC0603FR-072K7L"
 			(at 128.27 165.1 0)
 			(effects
 				(font
